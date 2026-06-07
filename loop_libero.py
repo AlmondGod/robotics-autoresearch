@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import shutil
 import subprocess
@@ -8,13 +9,12 @@ import sys
 import time
 from pathlib import Path
 
-from research.judge import judge
-
 
 TRAIN_FILE = Path("train.py")
 
 
 def main() -> None:
+    judge = _load_judge()
     parser = argparse.ArgumentParser()
     parser.add_argument("--iterations", type=int, default=1)
     parser.add_argument("--baseline", default="")
@@ -62,6 +62,15 @@ def _write_decision(run_dir: Path, decision: dict) -> None:
 
 def _run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True)
+
+
+def _load_judge():
+    spec = importlib.util.spec_from_file_location("libero_judge", Path("research/judge.py"))
+    if spec is None or spec.loader is None:
+        raise RuntimeError("could not load research/judge.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.judge
 
 
 if __name__ == "__main__":

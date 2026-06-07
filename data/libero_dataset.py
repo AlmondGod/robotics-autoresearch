@@ -56,14 +56,18 @@ def build_manifest(
     libero_root: Path,
     out_dir: Path,
     task_count: int = 5,
+    video_task_count: int | None = None,
     paired_demos_per_task: int = 10,
     seed: int = 0,
 ) -> dict[str, Any]:
     h5py = _h5py()
     dataset_dir = find_libero_object_dir(libero_root)
-    files = sorted(dataset_dir.glob("*.hdf5"))[:task_count]
+    video_task_count = task_count if video_task_count is None else video_task_count
+    files = sorted(dataset_dir.glob("*.hdf5"))[:video_task_count]
     if len(files) < task_count:
         raise ValueError(f"expected at least {task_count} LIBERO object task files in {dataset_dir}")
+    if len(files) < video_task_count:
+        raise ValueError(f"expected at least {video_task_count} LIBERO object task files in {dataset_dir}")
 
     rng = np.random.default_rng(seed)
     refs: list[DemoRef] = []
@@ -90,14 +94,16 @@ def build_manifest(
         by_split = {"train": [], "val": [], "test": []}
         for demo_key in order:
             by_split[split_for_key[str(demo_key)]].append(str(demo_key))
-        train_pair_count = max(1, int(0.8 * paired_demos_per_task))
-        val_pair_count = max(1, int(0.1 * paired_demos_per_task))
-        test_pair_count = max(1, paired_demos_per_task - train_pair_count - val_pair_count)
-        paired_keys = set(
-            by_split["train"][:train_pair_count]
-            + by_split["val"][:val_pair_count]
-            + by_split["test"][:test_pair_count]
-        )
+        paired_keys = set()
+        if task_id < task_count:
+            train_pair_count = max(1, int(0.8 * paired_demos_per_task))
+            val_pair_count = max(1, int(0.1 * paired_demos_per_task))
+            test_pair_count = max(1, paired_demos_per_task - train_pair_count - val_pair_count)
+            paired_keys = set(
+                by_split["train"][:train_pair_count]
+                + by_split["val"][:val_pair_count]
+                + by_split["test"][:test_pair_count]
+            )
         for demo_key in demo_keys:
             refs.append(
                 DemoRef(
@@ -109,14 +115,20 @@ def build_manifest(
                     paired=demo_key in paired_keys,
                 )
             )
-        tasks.append({"task_id": task_id, "task_name": task_name, "dataset_path": str(path)})
+        if task_id < task_count:
+            tasks.append({"task_id": task_id, "task_name": task_name, "dataset_path": str(path)})
 
     out_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
         "suite": "libero_object",
         "task_count": len(tasks),
+        "video_task_count": len(files),
         "paired_demos_per_task": paired_demos_per_task,
         "tasks": tasks,
+        "video_tasks": [
+            {"task_id": task_id, "task_name": path.stem, "dataset_path": str(path)}
+            for task_id, path in enumerate(files)
+        ],
         "demos": [asdict(ref) for ref in refs],
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True))
@@ -175,7 +187,8 @@ def materialize_shards(
         "video_path": str(video_path),
         "paired_path": str(paired_path),
         "video_demos": len(rows),
-        "paired_demos": len(paired_rows),
+        "paired_samples": len(paired_rows),
+        "paired_demos": sum(1 for ref in manifest["demos"] if ref["paired"]),
         "image_size": image_size,
         "history": history,
         "action_horizon": action_horizon,

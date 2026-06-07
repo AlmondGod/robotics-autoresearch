@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import time
 from pathlib import Path
 
 import torch
@@ -22,6 +23,8 @@ def main() -> None:
     parser.add_argument("--heads", type=int, default=4)
     parser.add_argument("--embd", type=int, default=128)
     parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--max-train-seconds", type=float, default=0.0)
+    parser.add_argument("--log-every", type=int, default=100)
     parser.add_argument("--device", default="auto")
     args = parser.parse_args()
 
@@ -32,15 +35,19 @@ def main() -> None:
     tokenizer.eval()
     train = load_video_npz(Path(args.data), split="train")
     val = load_video_npz(Path(args.data), split="val")
+    task_count = int(max(train["task_id"].max(), val["task_id"].max()) + 1)
     model = NanoVideoGPT(
         vocab_size=tok_ckpt["codebook_size"],
+        task_count=task_count,
         n_layer=args.layers,
         n_head=args.heads,
         n_embd=args.embd,
     ).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr)
 
-    for idx in batches(len(train["frames"]), args.batch_size, args.steps):
+    started = time.time()
+    last_loss = None
+    for step, idx in enumerate(batches(len(train["frames"]), args.batch_size, args.steps), start=1):
         with torch.no_grad():
             z = tokenizer.encode_indices(images_to_tensor(train["frames"][idx]).to(device)).reshape(len(idx), -1)
             z_next = tokenizer.encode_indices(images_to_tensor(train["next_frames"][idx]).to(device)).reshape(len(idx), -1)
@@ -49,6 +56,12 @@ def main() -> None:
         opt.zero_grad()
         loss.backward()
         opt.step()
+        last_loss = float(loss.detach().cpu())
+        if args.log_every > 0 and (step == 1 or step % args.log_every == 0):
+            print(f"step={step} val_target_nll={last_loss:.6f} elapsed_s={time.time() - started:.1f}", flush=True)
+        if args.max_train_seconds > 0 and time.time() - started >= args.max_train_seconds:
+            print(f"stopping_at_step={step} elapsed_s={time.time() - started:.1f}", flush=True)
+            break
 
     with torch.no_grad():
         n = min(len(val["frames"]), 256)
@@ -58,8 +71,16 @@ def main() -> None:
         _, val_loss = model(z, task_id, targets=z_next)
 
     out_dir = Path(args.out_dir)
-    ckpt = save_checkpoint(out_dir, "world_model.pt", model, {"vocab_size": tok_ckpt["codebook_size"]})
-    write_metrics(out_dir, {"val_video_nll": float(val_loss.cpu()), "checkpoint": str(ckpt)})
+    ckpt = save_checkpoint(out_dir, "world_model.pt", model, {"vocab_size": tok_ckpt["codebook_size"], "task_count": task_count})
+    write_metrics(
+        out_dir,
+        {
+            "val_video_nll": float(val_loss.cpu()),
+            "last_train_loss": last_loss,
+            "checkpoint": str(ckpt),
+            "train_seconds": time.time() - started,
+        },
+    )
     print(out_dir / "metrics.json")
 
 

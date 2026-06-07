@@ -1,36 +1,87 @@
 # Autoresearch Program
 
-You are a robotics research agent.
+You are a robotics research agent improving a tiny offline robot-learning stack
+on LIBERO-Object-5.
 
-Your objective is to improve held-out evaluation score under a simulated
-sim-to-real gap.
+## Objective
 
-## Editable Files
+Improve closed-loop task success in LIBERO while using only the fixed prepared
+data and the fixed evaluation harness.
+
+Primary metric:
+
+- `success_rate`
+
+Tie-breakers, in order:
+
+- lower `bc_loss`
+- lower action/video losses when those models are enabled
+
+## Editable Surface
 
 You may edit:
 
-- `research.py`
+- `train.py`
+
+You may change architecture, optimizer, learning rate, batch size, temporal
+context, augmentation, loss weights, data mix, and training schedule inside
+`train.py`.
 
 You may not edit:
 
-- `robotbench/`
-- `run_experiment.py`
-- `judge.py`
-- `plot_progress.py`
-- `robotbench/tasks/*.yaml`
-- existing run artifacts
+- `prepare.py`
+- `data/`
+- `eval/`
+- `research/judge.py`
+- `loop_libero.py`
+- generated datasets or run artifacts
+
+## Fixed Data
+
+`prepare.py` owns one-time setup and runtime constants:
+
+- 5 LIBERO object tasks
+- 250 video-only human teleop demos
+- 50 paired action/proprio demos
+- 4-frame history
+- 4-step action chunks
+- agentview and wrist RGB frames
+
+The model should treat paired actions as scarce. Video-only data is abundant
+relative to action labels and can be used for tokenizer/world-model style
+auxiliary learning.
+
+## Runtime Budget
+
+Each candidate run has at most 5 minutes of training:
+
+```bash
+python train.py --out-dir runs/libero/candidate --max-train-seconds 300
+```
+
+Evaluation runs after training and is not part of the training budget:
+
+```bash
+python prepare.py --eval-policy runs/libero/candidate/policy.pt
+```
+
+The loop command is:
+
+```bash
+python loop_libero.py --iterations 1 --max-train-seconds 300
+```
 
 ## Research Rules
 
 Each change should have a short hypothesis. Prefer small, testable changes over
-large rewrites. Do not exploit benchmark implementation details, remove safety
-penalties, change task definitions, or specialize to evaluation seeds.
+large rewrites.
 
-The training simulator is not the evaluation simulator. Your goal is robust
-policy learning, not overfitting the training world.
+Do not exploit evaluation implementation details, edit success criteria, change
+task definitions, tune to a single reset state, or modify fixed data splits.
 
-## Acceptance
+The clean thesis for v0 is:
 
-A change is considered useful only if `judge.py` accepts it against the current
-baseline. Safety regressions can reject a change even when task success improves.
-
+```text
+Can an AI researcher improve a tiny robot learning stack using cheap offline
+losses, while final selection is grounded by closed-loop robot task success?
+```

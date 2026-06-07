@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import time
 from pathlib import Path
 
 import torch
@@ -20,6 +21,8 @@ def main() -> None:
     parser.add_argument("--codebook-size", type=int, default=128)
     parser.add_argument("--embed-dim", type=int, default=64)
     parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--max-train-seconds", type=float, default=0.0)
+    parser.add_argument("--log-every", type=int, default=100)
     parser.add_argument("--device", default="auto")
     args = parser.parse_args()
 
@@ -29,12 +32,20 @@ def main() -> None:
     model = TinyVQTokenizer(args.codebook_size, args.embed_dim).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr)
     frames = train["frames"]
-    for idx in batches(len(frames), args.batch_size, args.steps):
+    started = time.time()
+    last_loss = None
+    for step, idx in enumerate(batches(len(frames), args.batch_size, args.steps), start=1):
         x = images_to_tensor(frames[idx]).to(device)
         out = model(x)
         opt.zero_grad()
         out["loss"].backward()
         opt.step()
+        last_loss = float(out["loss"].detach().cpu())
+        if args.log_every > 0 and (step == 1 or step % args.log_every == 0):
+            print(f"step={step} tokenizer_loss={last_loss:.6f} elapsed_s={time.time() - started:.1f}", flush=True)
+        if args.max_train_seconds > 0 and time.time() - started >= args.max_train_seconds:
+            print(f"stopping_at_step={step} elapsed_s={time.time() - started:.1f}", flush=True)
+            break
 
     with torch.no_grad():
         val_x = images_to_tensor(val["frames"][: min(len(val["frames"]), 256)]).to(device)
@@ -49,7 +60,16 @@ def main() -> None:
         model,
         {"codebook_size": args.codebook_size, "embed_dim": args.embed_dim},
     )
-    write_metrics(out_dir, {"video_loss": val_recon_mse, "tokenizer_loss": val_loss, "checkpoint": str(ckpt)})
+    write_metrics(
+        out_dir,
+        {
+            "video_loss": val_recon_mse,
+            "tokenizer_loss": val_loss,
+            "last_train_loss": last_loss,
+            "checkpoint": str(ckpt),
+            "train_seconds": time.time() - started,
+        },
+    )
     print(out_dir / "metrics.json")
 
 

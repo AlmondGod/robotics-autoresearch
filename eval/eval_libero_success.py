@@ -48,9 +48,11 @@ def main() -> None:
     proprio_dim = int(checkpoint["proprio_dim"])
     action_horizon = int(checkpoint.get("action_horizon", 1))
     history = int(checkpoint.get("history", 1))
+    n_embd = int(checkpoint.get("n_embd", 128))
     policy = TinyBCPolicy(
         action_dim=action_dim,
         proprio_dim=proprio_dim,
+        n_embd=n_embd,
         action_horizon=action_horizon,
         max_history=max(history, 1),
     ).to(device)

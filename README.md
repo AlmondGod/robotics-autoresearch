@@ -16,6 +16,7 @@ scaffolding has been removed.
 
 - LIBERO-Object seed benchmark with 5 paired-action tasks.
 - Extra LIBERO video-only demonstrations for tokenizer/world-model training.
+- 50 paired-action demos and 5,000 effective video-only demos by default.
 - Tiny image tokenizer.
 - NanoGPT-style video-token world model.
 - Inverse dynamics model.
@@ -44,6 +45,12 @@ Create the seed benchmark:
 python data/make_libero5.py --libero-root third_party/LIBERO --paired-demos-per-task 10
 python data/split_video_and_paired.py --manifest data/libero_object5/manifest.json
 ```
+
+The local LIBERO-Object raw pool contains 500 video demos. The default prep
+uses `video_repeat_factor = 10`, so tokenizer/world-model training sees 5,000
+effective video-only demos while paired-action data stays at 50 demos. The
+video shard stores raw frames once plus a virtual sample index, so this does not
+inflate the shard by 10x on disk.
 
 This produces:
 

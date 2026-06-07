@@ -17,6 +17,7 @@ PAIRED_SHARD = DATA_DIR / "libero_object5_paired.npz"
 TASK_COUNT = 5
 VIDEO_TASK_COUNT = 10
 PAIRED_DEMOS_PER_TASK = 10
+VIDEO_REPEAT_FACTOR = 10
 IMAGE_SIZE = 64
 HISTORY = 4
 ACTION_HORIZON = 4
@@ -52,6 +53,8 @@ def main() -> None:
                 str(VIDEO_TASK_COUNT),
                 "--paired-demos-per-task",
                 str(PAIRED_DEMOS_PER_TASK),
+                "--video-repeat-factor",
+                str(VIDEO_REPEAT_FACTOR),
             ]
         )
         _run(
@@ -70,6 +73,8 @@ def main() -> None:
                 str(HISTORY),
                 "--action-horizon",
                 str(ACTION_HORIZON),
+                "--video-repeat-factor",
+                str(VIDEO_REPEAT_FACTOR),
             ]
         )
     if args.eval_policy:
@@ -90,6 +95,7 @@ def dataset_summary() -> dict:
         manifest = json.loads(MANIFEST.read_text())
         summary["tasks"] = [task["task_name"] for task in manifest["tasks"]]
         summary["video_tasks"] = [task["task_name"] for task in manifest.get("video_tasks", manifest["tasks"])]
+        summary["video_repeat_factor"] = int(manifest.get("video_repeat_factor", 1))
         summary["demo_count"] = len(manifest["demos"])
         summary["paired_demo_count"] = sum(1 for demo in manifest["demos"] if demo["paired"])
     if VIDEO_SHARD.exists():
@@ -131,6 +137,12 @@ def _shape_summary(data: np.lib.npyio.NpzFile) -> dict:
     if "split" in data.files:
         values, counts = np.unique(data["split"], return_counts=True)
         fields["split_counts"] = {str(value): int(count) for value, count in zip(values, counts, strict=False)}
+    if "sample_index" in data.files:
+        values, counts = np.unique(data["virtual_split"], return_counts=True)
+        fields["virtual_split_counts"] = {str(value): int(count) for value, count in zip(values, counts, strict=False)}
+        fields["effective_samples"] = int(len(data["sample_index"]))
+        fields["raw_samples"] = int(len(data["frames"]))
+        fields["video_repeat_factor"] = int(data["video_repeat_factor"])
     return fields
 
 

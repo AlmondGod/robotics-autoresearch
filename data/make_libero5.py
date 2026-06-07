@@ -14,6 +14,7 @@ def main() -> None:
     parser.add_argument("--task-count", type=int, default=5)
     parser.add_argument("--video-task-count", type=int, default=10)
     parser.add_argument("--paired-demos-per-task", type=int, default=10)
+    parser.add_argument("--video-repeat-factor", type=int, default=10)
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
 
@@ -23,9 +24,10 @@ def main() -> None:
         task_count=args.task_count,
         video_task_count=args.video_task_count,
         paired_demos_per_task=args.paired_demos_per_task,
+        video_repeat_factor=args.video_repeat_factor,
         seed=args.seed,
     )
-    print(json.dumps({k: manifest[k] for k in ["suite", "task_count", "video_task_count", "paired_demos_per_task"]}, indent=2))
+    print(json.dumps({k: manifest[k] for k in ["suite", "task_count", "video_task_count", "paired_demos_per_task", "video_repeat_factor"]}, indent=2))
     print(Path(args.out_dir) / "manifest.json")
 
 

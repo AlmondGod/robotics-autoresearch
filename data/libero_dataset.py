@@ -58,6 +58,7 @@ def build_manifest(
     task_count: int = 5,
     video_task_count: int | None = None,
     paired_demos_per_task: int = 10,
+    video_repeat_factor: int = 1,
     seed: int = 0,
 ) -> dict[str, Any]:
     h5py = _h5py()
@@ -124,6 +125,7 @@ def build_manifest(
         "task_count": len(tasks),
         "video_task_count": len(files),
         "paired_demos_per_task": paired_demos_per_task,
+        "video_repeat_factor": video_repeat_factor,
         "tasks": tasks,
         "video_tasks": [
             {"task_id": task_id, "task_name": path.stem, "dataset_path": str(path)}
@@ -142,8 +144,12 @@ def materialize_shards(
     max_transitions_per_demo: int = 120,
     history: int = 4,
     action_horizon: int = 4,
+    video_repeat_factor: int | None = None,
 ) -> dict[str, Any]:
     manifest = json.loads(manifest_path.read_text())
+    video_repeat_factor = int(video_repeat_factor or manifest.get("video_repeat_factor", 1))
+    if video_repeat_factor < 1:
+        raise ValueError("video_repeat_factor must be >= 1")
     rows = []
     paired_rows = []
     for ref in manifest["demos"]:
@@ -181,12 +187,15 @@ def materialize_shards(
     out_dir.mkdir(parents=True, exist_ok=True)
     video_path = out_dir / "libero_object5_video.npz"
     paired_path = out_dir / "libero_object5_paired.npz"
-    _save_transition_rows(video_path, rows, include_actions=False)
+    _save_transition_rows(video_path, rows, include_actions=False, repeat_factor=video_repeat_factor)
     _save_transition_rows(paired_path, paired_rows, include_actions=True)
+    raw_video_demos = len(rows)
     summary = {
         "video_path": str(video_path),
         "paired_path": str(paired_path),
-        "video_demos": len(rows),
+        "raw_video_demos": raw_video_demos,
+        "video_repeat_factor": video_repeat_factor,
+        "video_demos": raw_video_demos * video_repeat_factor,
         "paired_samples": len(paired_rows),
         "paired_demos": sum(1 for ref in manifest["demos"] if ref["paired"]),
         "image_size": image_size,
@@ -199,6 +208,21 @@ def materialize_shards(
 
 def load_video_npz(path: Path, split: str = "train") -> dict[str, np.ndarray]:
     data = np.load(path)
+    if "sample_index" in data.files:
+        virtual_split = data["virtual_split"]
+        mask = virtual_split == split
+        sample_index = data["sample_index"][mask]
+        out: dict[str, Any] = {
+            "frames": IndexedArray(data["frames"], sample_index),
+            "wrist_frames": IndexedArray(data["wrist_frames"], sample_index),
+            "next_frames": IndexedArray(data["next_frames"], sample_index),
+            "task_id": IndexedArray(data["task_id"], sample_index),
+            "split": virtual_split[mask],
+            "sample_index": sample_index,
+            "raw_size": np.asarray(len(data["frames"]), dtype=np.int64),
+            "video_repeat_factor": data["video_repeat_factor"],
+        }
+        return out
     mask = data["split"] == split
     masked = {"frames", "wrist_frames", "next_frames", "task_id", "split"}
     return {key: data[key][mask] if key in masked else data[key] for key in data.files}
@@ -234,7 +258,24 @@ def load_demo_arrays(
     return frames, wrist_frames, proprio_arr, action_arr
 
 
-def _save_transition_rows(path: Path, rows: list[dict[str, Any]], include_actions: bool) -> None:
+class IndexedArray:
+    def __init__(self, base: np.ndarray, index: np.ndarray):
+        self.base = base
+        self.index = np.asarray(index, dtype=np.int64)
+        self.shape = (len(self.index), *base.shape[1:])
+        self.dtype = base.dtype
+
+    def __len__(self) -> int:
+        return len(self.index)
+
+    def __getitem__(self, item: Any) -> np.ndarray:
+        return self.base[self.index[item]]
+
+    def max(self) -> Any:
+        return self.base[self.index].max()
+
+
+def _save_transition_rows(path: Path, rows: list[dict[str, Any]], include_actions: bool, repeat_factor: int = 1) -> None:
     if not rows:
         raise ValueError(f"no rows to save for {path}")
     if include_actions:
@@ -258,6 +299,11 @@ def _save_transition_rows(path: Path, rows: list[dict[str, Any]], include_action
             payload["wrist_frames"] = np.stack([row["wrist_frames"] for row in rows], axis=0)
         else:
             payload["wrist_frames"] = np.concatenate([row["wrist_frames"] for row in rows], axis=0)
+    if not include_actions and repeat_factor > 1:
+        base_count = len(payload["frames"])
+        payload["sample_index"] = np.tile(np.arange(base_count, dtype=np.int64), repeat_factor)
+        payload["virtual_split"] = np.tile(payload["split"], repeat_factor)
+        payload["video_repeat_factor"] = np.asarray(repeat_factor, dtype=np.int64)
     if include_actions:
         payload["proprio"] = np.stack([row["proprio"] for row in rows], axis=0)
         payload["actions"] = np.stack([row["actions"] for row in rows], axis=0)

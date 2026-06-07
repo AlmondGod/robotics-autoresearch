@@ -10,6 +10,13 @@ dependencies = [
 [project.optional-dependencies]
 plot = ["matplotlib>=3.8"]
 mujoco = ["mujoco>=3.2.0"]
+ppo = ["torch>=2.2"]
+libero = [
+  "torch>=2.2",
+  "h5py>=3.10",
+  "pillow>=10.0",
+  "tqdm>=4.66",
+]
 
 [tool.setuptools]
 py-modules = [
@@ -22,4 +29,4 @@ py-modules = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["robotbench*"]
+include = ["robotbench*", "data*", "models*", "train*", "eval*"]

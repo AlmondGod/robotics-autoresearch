@@ -9,6 +9,7 @@ import numpy as np
 
 from robotbench.config import TaskConfig
 from robotbench.envs import make_env
+from robotbench.ppo import TorchPpoPolicy, train_ppo_policy
 from robotbench.train import TrainBudget
 
 
@@ -126,13 +127,15 @@ def train_policy(
     budget: TrainBudget,
     seed: int,
     backend: str = "toy",
-) -> LinearPolicy | ScaledLinearPolicy | RobustTaskPolicy | AlohaBimanualPolicy | MobileAlohaMockPolicy:
+) -> LinearPolicy | ScaledLinearPolicy | RobustTaskPolicy | AlohaBimanualPolicy | MobileAlohaMockPolicy | TorchPpoPolicy:
     """Return a robust low-data controller for the current task.
 
     Hypothesis: for phase 1's state-observed reaching and pushing tasks, a
     clipped geometric feedback controller should transfer better across the
     eval dynamics shift than a sample-hungry linear-policy search.
     """
+    if backend == "arx_l5":
+        return train_ppo_policy(task=task, budget=budget, seed=seed, backend=backend)
     if backend == "mobile_aloha_mock":
         return MobileAlohaMockPolicy(action_limit=task.action_limit)
     if backend in {"toy", "mujoco"} and task.name in {"reach", "push"}:
@@ -197,14 +200,14 @@ def _train_cem_policy(
 
 
 def act(
-    policy: LinearPolicy | ScaledLinearPolicy | RobustTaskPolicy | AlohaBimanualPolicy | MobileAlohaMockPolicy,
+    policy: LinearPolicy | ScaledLinearPolicy | RobustTaskPolicy | AlohaBimanualPolicy | MobileAlohaMockPolicy | TorchPpoPolicy,
     obs: np.ndarray,
 ) -> np.ndarray:
     return policy.act(obs)
 
 
 def save_policy(
-    policy: LinearPolicy | ScaledLinearPolicy | RobustTaskPolicy | AlohaBimanualPolicy | MobileAlohaMockPolicy,
+    policy: LinearPolicy | ScaledLinearPolicy | RobustTaskPolicy | AlohaBimanualPolicy | MobileAlohaMockPolicy | TorchPpoPolicy,
     path: str,
 ) -> None:
     if isinstance(policy, LinearPolicy):
@@ -228,6 +231,21 @@ def save_policy(
     if isinstance(policy, MobileAlohaMockPolicy):
         np.savez(path, kind="mobile_aloha_mock", action_limit=policy.action_limit)
         return
+    if isinstance(policy, TorchPpoPolicy):
+        state = policy.serializable_state()
+        np.savez(
+            path,
+            kind="torch_ppo",
+            obs_dim=policy.obs_dim,
+            act_dim=policy.act_dim,
+            hidden_dim=policy.hidden_dim,
+            architecture=policy.architecture,
+            image_shape=np.asarray(policy.image_shape if policy.image_shape else [-1, -1]),
+            proprio_dim=policy.proprio_dim,
+            state_keys=np.asarray(list(state.keys())),
+            **state,
+        )
+        return
     raise TypeError(f"unsupported policy type: {type(policy).__name__}")
 
 
@@ -248,6 +266,21 @@ def load_policy(path: str):
         return AlohaBimanualPolicy(action_limit=float(data["action_limit"]))
     if kind == "mobile_aloha_mock":
         return MobileAlohaMockPolicy(action_limit=float(data["action_limit"]))
+    if kind == "torch_ppo":
+        architecture = str(data["architecture"]) if "architecture" in data else "mlp"
+        raw_image_shape = data["image_shape"] if "image_shape" in data else np.asarray([-1, -1])
+        image_shape = tuple(int(v) for v in raw_image_shape)
+        if image_shape == (-1, -1):
+            image_shape = None
+        return TorchPpoPolicy(
+            obs_dim=int(data["obs_dim"]),
+            act_dim=int(data["act_dim"]),
+            hidden_dim=int(data["hidden_dim"]),
+            state_dict={str(key): data[str(key)] for key in data["state_keys"]},
+            architecture=architecture,
+            image_shape=image_shape,
+            proprio_dim=int(data["proprio_dim"]) if "proprio_dim" in data else 0,
+        )
     raise ValueError(f"unknown policy kind: {kind}")
 
 

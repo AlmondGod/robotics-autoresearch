@@ -13,8 +13,8 @@ from robotbench.train import TrainBudget
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task", default="reach", choices=["reach", "push"])
-    parser.add_argument("--backend", default="toy", choices=["toy", "mujoco", "aloha", "mobile_aloha_mock"])
+    parser.add_argument("--task", default="reach", choices=["reach", "push", "pick_place"])
+    parser.add_argument("--backend", default="toy", choices=["toy", "mujoco", "aloha", "mobile_aloha_mock", "arx_l5"])
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--budget-seconds", type=float, default=60.0)
     parser.add_argument("--out", default="")
@@ -145,7 +145,7 @@ def _write_svg(
         f'<line x1="{target_x - 11:.1f}" y1="{target_y:.1f}" x2="{target_x + 11:.1f}" y2="{target_y:.1f}" stroke="#2ca02c" stroke-width="2"/>',
         f'<line x1="{target_x:.1f}" y1="{target_y - 11:.1f}" x2="{target_x:.1f}" y2="{target_y + 11:.1f}" stroke="#2ca02c" stroke-width="2"/>',
     ]
-    if task_name == "push":
+    if task_name.endswith("/pick_place") or task_name == "push":
         parts.extend(
             [
                 f'<polyline points="{obj_polyline}" fill="none" stroke="#ff7f0e" stroke-width="2" stroke-dasharray="6 4"/>',

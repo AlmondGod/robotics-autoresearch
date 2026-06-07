@@ -1,6 +1,95 @@
-# robot-autoresearch
+# nano-robot-worlds
 
-Phase 1 robotics autoresearch harness.
+Offline-first robotics autoresearch on LIBERO-Object-5.
+
+The active v0 question is:
+
+```text
+Can an AI researcher improve a tiny robot learning stack using cheap offline
+losses, while final selection is grounded by closed-loop robot task success?
+```
+
+RL is not part of the active v0 stack. The current stack is:
+
+- video-only LIBERO demonstrations for image/token/world-model training
+- 5-10 paired action demonstrations per task for BC/inverse dynamics
+- tiny image tokenizer
+- nanoGPT-style video-token world model
+- inverse dynamics model
+- tiny BC policy
+- offline metrics plus fixed LIBERO closed-loop success evaluation
+
+## LIBERO Setup
+
+Install local dependencies:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[libero]"
+```
+
+Fetch LIBERO and download LIBERO-Object:
+
+```bash
+python data/download_libero.py --dataset libero_object --use-huggingface
+```
+
+Create the seed benchmark:
+
+```bash
+python data/make_libero5.py --libero-root third_party/LIBERO --paired-demos-per-task 10
+python data/split_video_and_paired.py --manifest data/libero_object5/manifest.json
+```
+
+This produces:
+
+```text
+data/libero_object5/manifest.json
+data/libero_object5/libero_object5_video.npz
+data/libero_object5/libero_object5_paired.npz
+```
+
+## V0 Training
+
+BC baseline:
+
+```bash
+python research/run_experiment.py --config configs/libero_v0_bc.json --skip-success-eval
+```
+
+Tokenizer + world model + inverse dynamics + BC:
+
+```bash
+python research/run_experiment.py --config configs/libero_v0_world_inverse.json --skip-success-eval
+```
+
+Offline metric table:
+
+```bash
+python eval/eval_offline.py --runs-root runs/libero
+```
+
+Closed-loop LIBERO success evaluation lives in `eval/eval_libero_success.py`.
+That file is the fixed eval surface for v0 and should not be modified by
+autoresearch experiments once the LIBERO observation/action adapter is wired.
+
+## V0 Milestone Table
+
+```text
+method              video_loss   action_mse   bc_loss   success_rate
+BC baseline         -            -            x         x%
+BC + tokenizer      x            -            x         x%
+BC + world loss     x            -            x         x%
+BC + inverse loss   x            x            x         x%
+```
+
+Autoresearch experiments are JSON configs under `configs/`. The agent may vary
+model size, tokenizer type, context length, data mix, loss weights, learning
+rate, augmentation, demo count, and which model is evaluated. It may not touch
+fixed eval code.
+
+## Legacy Sim Harness
 
 This repository is a small, constrained robotics research loop inspired by
 Karpathy's `autoresearch`, adapted for simulated sim-to-real gaps. The agent's
@@ -18,7 +107,8 @@ fixed.
 - Plotting utility for commit/change/score progress over time.
 
 Phase 1 intentionally excludes real robots, internet data, behavior cloning
-demos, vision policies, and external datasets.
+demos, and external datasets. The ARX L5 backend adds a first vision-policy
+training surface inside simulation.
 
 ## Quick Start
 
@@ -87,6 +177,40 @@ python render_eval_video.py --backend aloha --task reach --out runs/aloha_eval_r
 
 The fetched assets are stored under `third_party/mujoco_menagerie/` and are
 ignored by git. Keep using the fetch script so the source and license are clear.
+
+## ARX L5 Camera PPO Backend
+
+The `arx_l5` backend uses the single-arm ARX L5 model from MuJoCo Menagerie.
+Observations are one 24x24 grayscale frame from the robot wrist camera plus
+compact proprio/task deltas. PPO uses a small CNN encoder. Actions are 7
+normalized position-control deltas: 6 arm joints plus the gripper actuator.
+
+Install the optional dependencies and fetch the model:
+
+```bash
+pip install -e ".[mujoco,ppo]"
+python scripts/fetch_menagerie.py --model arx_l5
+```
+
+Run a short PPO experiment and render the saved policy:
+
+```bash
+python run_experiment.py --backend arx_l5 --task reach --budget-seconds 60 --seeds 0
+python render_eval_video.py --backend arx_l5 --task reach --policy-path runs/<run-id>/policy_seed0.npz --out runs/arx_l5_eval_reach.mp4
+```
+
+`pick_place` adds a kinematic object and placement target. Metrics include
+stage rates for reaching the object, grasping, lifting, and placing. Training
+can use a staged curriculum while eval remains full pick-and-place:
+
+```bash
+python run_experiment.py --backend arx_l5 --task pick_place --curriculum-stage reach --budget-seconds 60 --seeds 0
+python run_experiment.py --backend arx_l5 --task pick_place --curriculum-stage full --budget-seconds 300 --seeds 0
+```
+
+Short CPU runs are mostly smoke tests because MuJoCo camera rendering is the
+bottleneck. Longer runs or a CNN policy are needed before treating this as a
+strong pixel-control baseline.
 
 ## Mobile ALOHA Status
 

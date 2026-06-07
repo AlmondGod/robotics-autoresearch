@@ -1,0 +1,5 @@
+assets: /Users/almondgod/robot-autoresearch/third_party/LIBERO/libero/libero/assets
+bddl_files: /Users/almondgod/robot-autoresearch/third_party/LIBERO/libero/libero/bddl_files
+benchmark_root: /Users/almondgod/robot-autoresearch/third_party/LIBERO/libero/libero
+datasets: /Users/almondgod/robot-autoresearch/third_party/LIBERO/libero/datasets
+init_states: /Users/almondgod/robot-autoresearch/third_party/LIBERO/libero/libero/init_files

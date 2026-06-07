@@ -140,4 +140,8 @@ def make_env(task: TaskConfig, world: str, seed: int, backend: str = "toy"):
         from robotbench.aloha_envs import make_mobile_aloha_mock_env
 
         return make_mobile_aloha_mock_env(task=task, world=world, seed=seed)
+    if backend == "arx_l5":
+        from robotbench.arx_l5_envs import make_arx_l5_env
+
+        return make_arx_l5_env(task=task, world=world, seed=seed)
     raise ValueError(f"unknown backend '{backend}'")

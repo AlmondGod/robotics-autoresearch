@@ -1,0 +1,17 @@
+{
+  "change": "BC baseline",
+  "method": "bc",
+  "train_steps": 2000,
+  "data": {
+    "paired": "data/libero_object5/libero_object5_paired.npz",
+    "video": "data/libero_object5/libero_object5_video.npz"
+  },
+  "models": {
+    "tokenizer": null,
+    "policy": {
+      "lr": 0.0003,
+      "batch_size": 64
+    }
+  },
+  "metrics": ["bc_loss", "success_rate"]
+}

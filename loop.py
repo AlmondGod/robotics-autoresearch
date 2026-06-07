@@ -15,8 +15,8 @@ RESEARCH_FILE = Path("research.py")
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task", default="reach", choices=["reach", "push"])
-    parser.add_argument("--backend", default="toy", choices=["toy", "mujoco", "aloha", "mobile_aloha_mock"])
+    parser.add_argument("--task", default="reach", choices=["reach", "push", "pick_place"])
+    parser.add_argument("--backend", default="toy", choices=["toy", "mujoco", "aloha", "mobile_aloha_mock", "arx_l5"])
     parser.add_argument("--iterations", type=int, default=1)
     parser.add_argument("--budget-seconds", type=float, default=30.0)
     parser.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2])

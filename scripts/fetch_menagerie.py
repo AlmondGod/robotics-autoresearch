@@ -11,7 +11,7 @@ REPO_URL = "https://github.com/google-deepmind/mujoco_menagerie.git"
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="aloha", choices=["aloha"])
+    parser.add_argument("--model", default="aloha", choices=["aloha", "arx_l5"])
     parser.add_argument("--dest", default="third_party/mujoco_menagerie")
     args = parser.parse_args()
     fetch_model(model=args.model, dest=Path(args.dest))

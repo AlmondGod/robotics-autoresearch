@@ -16,8 +16,8 @@ from robotbench.train import TrainBudget
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task", default="reach", choices=["reach", "push"])
-    parser.add_argument("--backend", default="toy", choices=["toy", "mujoco", "aloha", "mobile_aloha_mock"])
+    parser.add_argument("--task", default="reach", choices=["reach", "push", "pick_place"])
+    parser.add_argument("--backend", default="toy", choices=["toy", "mujoco", "aloha", "mobile_aloha_mock", "arx_l5"])
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--budget-seconds", type=float, default=60.0)
     parser.add_argument("--out", default="runs/eval_rollout.mp4")
@@ -76,7 +76,7 @@ def render_video(
         trail.append(_env_ee(env))
         obj_trail.append(_env_obj(env))
         final_info = result.info
-        if backend in {"mujoco", "aloha", "mobile_aloha_mock"}:
+        if backend in {"mujoco", "aloha", "mobile_aloha_mock", "arx_l5"}:
             width, height = (1280, 720) if backend in {"aloha", "mobile_aloha_mock"} else (720, 720)
             frame = env.render_rgb(width=width, height=height)
             _status_bar(
@@ -188,7 +188,7 @@ def _draw_frame(
     _circle(image, current, 11, (31, 119, 180))
     _target(image, target_xy, 15, (44, 160, 44))
 
-    if task_name == "push":
+    if task_name in {"push", "pick_place"}:
         for a, b in zip(obj[:-1], obj[1:], strict=False):
             _line(image, xy(a), xy(b), (255, 170, 80), 2)
         _circle(image, xy(obj[-1]), 10, (255, 127, 14))

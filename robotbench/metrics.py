@@ -28,7 +28,7 @@ def aggregate_episodes(episodes: list[dict[str, Any]]) -> dict[str, Any]:
         - 0.1 * avg_distance
     )
 
-    return {
+    result = {
         "episodes": len(episodes),
         "score": score,
         "success_rate": success_rate,
@@ -40,4 +40,14 @@ def aggregate_episodes(episodes: list[dict[str, Any]]) -> dict[str, Any]:
         "joint_limit_violations": joint_violations,
         "torque_limit_violations": torque_violations,
     }
-
+    for key in ["reach_object", "grasp", "lift", "place"]:
+        if key in episodes[0]:
+            result[f"{key}_rate"] = mean(1.0 if ep.get(key, False) else 0.0 for ep in episodes)
+    for source, target in [
+        ("object_distance_min", "avg_object_distance_min"),
+        ("place_distance_min", "avg_place_distance_min"),
+        ("lift_height_max", "avg_lift_height_max"),
+    ]:
+        if source in episodes[0]:
+            result[target] = mean(float(ep.get(source, 0.0)) for ep in episodes)
+    return result

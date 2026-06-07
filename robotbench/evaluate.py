@@ -26,17 +26,34 @@ def rollout(
     energy = 0.0
     jerk = 0.0
     final_info: dict[str, Any] = {}
+    stage_flags = {
+        "reach_object": False,
+        "grasp": False,
+        "lift": False,
+        "place": False,
+    }
+    min_object_distance = float("inf")
+    min_place_distance = float("inf")
+    max_lift_height = 0.0
     for _ in range(task.horizon):
         result = env.step(policy_fn(obs))
         obs = result.obs
         total_reward += result.reward
         energy += float(result.info.get("energy", 0.0))
         jerk += float(result.info.get("jerk", 0.0))
+        for key in stage_flags:
+            stage_flags[key] = stage_flags[key] or bool(result.info.get(key, False))
+        if "object_distance" in result.info:
+            min_object_distance = min(min_object_distance, float(result.info["object_distance"]))
+        if "place_distance" in result.info:
+            min_place_distance = min(min_place_distance, float(result.info["place_distance"]))
+        if "lift_height" in result.info:
+            max_lift_height = max(max_lift_height, float(result.info["lift_height"]))
         final_info = result.info
         if result.terminated or result.truncated:
             break
 
-    return {
+    episode = {
         "return": total_reward,
         "success": bool(final_info.get("success", False)),
         "distance": float(final_info.get("distance", 999.0)),
@@ -46,6 +63,13 @@ def rollout(
         "torque_limit_violations": int(final_info.get("torque_limit_violations", 0)),
         "catastrophe": bool(final_info.get("catastrophe", False)),
     }
+    if "curriculum_stage" in final_info:
+        episode.update(stage_flags)
+        episode["object_distance_min"] = min_object_distance
+        episode["place_distance_min"] = min_place_distance
+        episode["lift_height_max"] = max_lift_height
+        episode["curriculum_stage"] = str(final_info["curriculum_stage"])
+    return episode
 
 
 def evaluate_policy(

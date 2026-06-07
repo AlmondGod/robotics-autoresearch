@@ -22,13 +22,14 @@ from robotbench.train import TrainBudget
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task", default="reach", choices=["reach", "push"])
-    parser.add_argument("--backend", default="toy", choices=["toy", "mujoco", "aloha", "mobile_aloha_mock"])
+    parser.add_argument("--task", default="reach", choices=["reach", "push", "pick_place"])
+    parser.add_argument("--backend", default="toy", choices=["toy", "mujoco", "aloha", "mobile_aloha_mock", "arx_l5"])
     parser.add_argument("--budget-seconds", type=float, default=30.0)
     parser.add_argument("--seeds", type=int, nargs="+", default=[0])
     parser.add_argument("--episodes-per-seed", type=int, default=5)
     parser.add_argument("--max-iterations", type=int, default=30)
     parser.add_argument("--rollouts-per-iteration", type=int, default=24)
+    parser.add_argument("--curriculum-stage", default="", choices=["", "reach", "grasp", "lift", "place", "full"])
     parser.add_argument("--change-note", default="")
     parser.add_argument("--run-id", default="")
     args = parser.parse_args()
@@ -41,6 +42,7 @@ def main() -> None:
         episodes_per_seed=args.episodes_per_seed,
         max_iterations=args.max_iterations,
         rollouts_per_iteration=args.rollouts_per_iteration,
+        curriculum_stage=args.curriculum_stage or None,
         change_note=args.change_note,
         run_id=args.run_id or None,
     )
@@ -57,8 +59,11 @@ def run_experiment(
     rollouts_per_iteration: int,
     change_note: str,
     run_id: str | None = None,
+    curriculum_stage: str | None = None,
 ) -> dict[str, Any]:
     task = load_task(task_name)
+    if curriculum_stage:
+        task.train["curriculum_stage"] = curriculum_stage
     run_id = run_id or f"{utc_now_id()}-{backend}-{task_name}"
     run_dir = RUNS_DIR / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
@@ -99,6 +104,7 @@ def run_experiment(
                 "seed": seed,
                 "policy_path": str(policy_path),
                 "train_elapsed_seconds": train_elapsed_seconds,
+                "training_info": getattr(policy, "training_info", {}),
                 "train": train_metrics,
                 "eval": eval_metrics,
             }
@@ -113,6 +119,7 @@ def run_experiment(
         "seeds": seeds,
         "episodes_per_seed": episodes_per_seed,
         "change_note": change_note,
+        "curriculum_stage": curriculum_stage,
         "git_commit": git_commit(),
         "git_diff_summary": git_diff_summary(),
         "per_seed": per_seed,
@@ -154,7 +161,26 @@ def summarize(task_name: str, backend: str, per_seed: list[dict[str, Any]]) -> d
         "eval_avg_distance": avg(("eval", "avg_distance")),
         "eval_joint_limit_violations": avg(("eval", "joint_limit_violations")),
         "eval_torque_limit_violations": avg(("eval", "torque_limit_violations")),
+        **_optional_summary(per_seed),
     }
+
+
+def _optional_summary(per_seed: list[dict[str, Any]]) -> dict[str, float]:
+    optional = {}
+    keys = [
+        "reach_object_rate",
+        "grasp_rate",
+        "lift_rate",
+        "place_rate",
+        "avg_object_distance_min",
+        "avg_place_distance_min",
+        "avg_lift_height_max",
+    ]
+    for split in ["train", "eval"]:
+        for key in keys:
+            if key in per_seed[0][split]:
+                optional[f"{split}_{key}"] = sum(float(row[split][key]) for row in per_seed) / len(per_seed)
+    return optional
 
 
 if __name__ == "__main__":

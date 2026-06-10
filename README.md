@@ -1,6 +1,8 @@
 # nano-robot-worlds
 
-Offline-first robotics autoresearch on LIBERO-Object-5.
+Offline-first robotics autoresearch. The current implementation is LIBERO-first,
+with a new RoboCasa-5 learned-evaluator track for testing whether fast learned
+world-model scores can replace most slow simulator rollouts during policy search.
 
 The active v0 question is:
 
@@ -24,6 +26,43 @@ scaffolding has been removed.
 - Conditional flow-matching action policy.
 - Fixed closed-loop LIBERO success evaluation.
 - JSONL autoresearch ledger for commit/change/metric graphing.
+
+## RoboCasa Learned-Evaluator Track
+
+The next launchable claim is:
+
+```text
+Can a fast learned world-model evaluator rank robot policy variants well enough
+to reduce slow RoboCasa simulator rollouts?
+```
+
+The RoboCasa track lives in:
+
+```text
+research/robocasa_world_evaluator.md
+program_robocasa.md
+configs/robocasa5_world_evaluator.json
+```
+
+Create the seed manifest:
+
+```bash
+python data/make_robocasa5.py --out data/robocasa5/manifest.json
+```
+
+Analyze a learned-evaluator calibration archive:
+
+```bash
+python eval/eval_world_model_ranking.py \
+  --candidates runs/robocasa5/candidates.jsonl \
+  --out runs/robocasa5/evaluator_ranking_metrics.json \
+  --plot runs/robocasa5/evaluator_correlation.svg
+```
+
+Candidate rows should include `learned_score`, `sim_success`,
+`learned_eval_rollouts`, `learned_eval_seconds`, `sim_eval_rollouts`, and
+`sim_eval_seconds`. The script reports Spearman rank correlation, Pearson
+correlation, top-k hit rate, and measured evaluator-vs-sim speedup.
 
 ## Setup
 

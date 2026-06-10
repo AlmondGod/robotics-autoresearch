@@ -1,0 +1,47 @@
+{
+  "action_dim": 7,
+  "benchmark": "robocasa5",
+  "demos_per_task": 50,
+  "notes": [
+    "This manifest is intentionally declarative.",
+    "Use task-map if local RoboCasa task ids differ from the aliases.",
+    "Real dataset paths are filled by the RoboCasa/LeRobot data adapter."
+  ],
+  "suite": "robocasa",
+  "tasks": [
+    {
+      "alias": "OpenDrawer",
+      "description": "Open a kitchen drawer.",
+      "robocasa_task": "OpenDrawer",
+      "task_id": 0
+    },
+    {
+      "alias": "CloseDrawer",
+      "description": "Close a kitchen drawer.",
+      "robocasa_task": "CloseDrawer",
+      "task_id": 1
+    },
+    {
+      "alias": "PickPlaceCounterToStove",
+      "description": "Pick an object from the counter and place it on the stove.",
+      "robocasa_task": "PickPlaceCounterToStove",
+      "task_id": 2
+    },
+    {
+      "alias": "TurnOffStove",
+      "description": "Turn a stove knob off.",
+      "robocasa_task": "TurnOffStove",
+      "task_id": 3
+    },
+    {
+      "alias": "PickPlaceObjectBetweenRegions",
+      "description": "Move an object between marked regions or containers.",
+      "robocasa_task": "PickPlaceObjectBetweenRegions",
+      "task_id": 4
+    }
+  ],
+  "views": [
+    "robot0_agentview_left",
+    "robot0_agentview_right"
+  ]
+}

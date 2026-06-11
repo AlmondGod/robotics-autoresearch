@@ -17,19 +17,53 @@
 <text x="62" y="104.0" text-anchor="end" font-family="Arial" font-size="11">0.80</text>
 <line x1="66" y1="35.0" x2="870" y2="35.0" stroke="#eee"/>
 <text x="62" y="39.0" text-anchor="end" font-family="Arial" font-size="11">1.00</text>
-<polyline fill="none" stroke="#238b45" stroke-width="2" points="70.0,360.0 203.3,313.6 336.7,360.0 470.0,313.6 603.3,220.7 736.7,220.7 870.0,174.3"/>
+<polyline fill="none" stroke="#238b45" stroke-width="2" points="70.0,360.0 104.8,313.6 139.6,360.0 174.3,313.6 209.1,220.7 243.9,220.7 278.7,174.3 313.5,220.7 348.3,267.1 383.0,267.1 417.8,267.1 452.6,220.7 487.4,360.0 522.2,220.7 557.0,267.1 591.7,174.3 626.5,360.0 661.3,313.6 696.1,267.1 730.9,174.3 765.7,127.9 800.4,174.3 835.2,174.3 870.0,174.3"/>
 <circle cx="70.0" cy="360.0" r="5" fill="#bbb" stroke="#333"/>
 <text x="77.0" y="353.0" font-family="Arial" font-size="10" fill="#333">flow chunk 16 commit 4 chunk_decay 0</text>
-<circle cx="203.3" cy="313.6" r="5" fill="#2ecc71" stroke="#333"/>
-<text x="210.3" y="306.6" font-family="Arial" font-size="10" fill="#333">direct BC chunk 16 commit 4 chunk_de</text>
-<circle cx="336.7" cy="360.0" r="5" fill="#bbb" stroke="#333"/>
-<text x="343.7" y="353.0" font-family="Arial" font-size="10" fill="#333">direct BC chunk 8 commit 2 chunk_dec</text>
-<circle cx="470.0" cy="313.6" r="5" fill="#bbb" stroke="#333"/>
-<text x="477.0" y="306.6" font-family="Arial" font-size="10" fill="#333">eval accepted exp2 checkpoint with c</text>
-<circle cx="603.3" cy="220.7" r="5" fill="#2ecc71" stroke="#333"/>
-<text x="610.3" y="213.7" font-family="Arial" font-size="10" fill="#333">eval accepted exp2 checkpoint with c</text>
-<circle cx="736.7" cy="220.7" r="5" fill="#bbb" stroke="#333"/>
-<text x="743.7" y="213.7" font-family="Arial" font-size="10" fill="#333">eval accepted exp2 checkpoint with c</text>
-<circle cx="870.0" cy="174.3" r="5" fill="#2ecc71" stroke="#333"/>
-<text x="877.0" y="167.3" font-family="Arial" font-size="10" fill="#333">eval accepted exp2 checkpoint with c</text>
+<circle cx="104.8" cy="313.6" r="5" fill="#2ecc71" stroke="#333"/>
+<text x="111.8" y="306.6" font-family="Arial" font-size="10" fill="#333">direct BC chunk 16 commit 4 chunk_de</text>
+<circle cx="139.6" cy="360.0" r="5" fill="#bbb" stroke="#333"/>
+<text x="146.6" y="353.0" font-family="Arial" font-size="10" fill="#333">direct BC chunk 8 commit 2 chunk_dec</text>
+<circle cx="174.3" cy="313.6" r="5" fill="#bbb" stroke="#333"/>
+<text x="181.3" y="306.6" font-family="Arial" font-size="10" fill="#333">eval accepted exp2 checkpoint with c</text>
+<circle cx="209.1" cy="220.7" r="5" fill="#2ecc71" stroke="#333"/>
+<text x="216.1" y="213.7" font-family="Arial" font-size="10" fill="#333">eval accepted exp2 checkpoint with c</text>
+<circle cx="243.9" cy="220.7" r="5" fill="#bbb" stroke="#333"/>
+<text x="250.9" y="213.7" font-family="Arial" font-size="10" fill="#333">eval accepted exp2 checkpoint with c</text>
+<circle cx="278.7" cy="174.3" r="5" fill="#2ecc71" stroke="#333"/>
+<text x="285.7" y="167.3" font-family="Arial" font-size="10" fill="#333">eval accepted exp2 checkpoint with c</text>
+<circle cx="313.5" cy="220.7" r="5" fill="#bbb" stroke="#333"/>
+<text x="320.5" y="213.7" font-family="Arial" font-size="10" fill="#333">direct BC chunk 24 commit 24 chunk_d</text>
+<circle cx="348.3" cy="267.1" r="5" fill="#bbb" stroke="#333"/>
+<text x="355.3" y="260.1" font-family="Arial" font-size="10" fill="#333">ACT temporal ensemble commit 1 decay</text>
+<circle cx="383.0" cy="267.1" r="5" fill="#bbb" stroke="#333"/>
+<text x="390.0" y="260.1" font-family="Arial" font-size="10" fill="#333">ACT temporal ensemble commit 2 decay</text>
+<circle cx="417.8" cy="267.1" r="5" fill="#bbb" stroke="#333"/>
+<text x="424.8" y="260.1" font-family="Arial" font-size="10" fill="#333">ACT temporal ensemble commit 4 decay</text>
+<circle cx="452.6" cy="220.7" r="5" fill="#bbb" stroke="#333"/>
+<text x="459.6" y="213.7" font-family="Arial" font-size="10" fill="#333">ACT temporal ensemble commit 8 decay</text>
+<circle cx="487.4" cy="360.0" r="5" fill="#bbb" stroke="#333"/>
+<text x="494.4" y="353.0" font-family="Arial" font-size="10" fill="#333">retrain BC chunk16 decay0.9 commit16</text>
+<circle cx="522.2" cy="220.7" r="5" fill="#bbb" stroke="#333"/>
+<text x="529.2" y="213.7" font-family="Arial" font-size="10" fill="#333">retrain BC chunk16 decay1.0 commit16</text>
+<circle cx="557.0" cy="267.1" r="5" fill="#bbb" stroke="#333"/>
+<text x="564.0" y="260.1" font-family="Arial" font-size="10" fill="#333">retrain BC chunk16 width1024 commit1</text>
+<circle cx="591.7" cy="174.3" r="5" fill="#bbb" stroke="#333"/>
+<text x="598.7" y="167.3" font-family="Arial" font-size="10" fill="#333">retrain BC chunk16 seed1 commit16</text>
+<circle cx="626.5" cy="360.0" r="5" fill="#bbb" stroke="#333"/>
+<text x="633.5" y="353.0" font-family="Arial" font-size="10" fill="#333">seed1 checkpoint commit 8</text>
+<circle cx="661.3" cy="313.6" r="5" fill="#bbb" stroke="#333"/>
+<text x="668.3" y="306.6" font-family="Arial" font-size="10" fill="#333">seed1 checkpoint commit 12</text>
+<circle cx="696.1" cy="267.1" r="5" fill="#bbb" stroke="#333"/>
+<text x="703.1" y="260.1" font-family="Arial" font-size="10" fill="#333">seed1 checkpoint commit 14</text>
+<circle cx="730.9" cy="174.3" r="5" fill="#bbb" stroke="#333"/>
+<text x="737.9" y="167.3" font-family="Arial" font-size="10" fill="#333">seed1 checkpoint temporal ensemble c</text>
+<circle cx="765.7" cy="127.9" r="5" fill="#2ecc71" stroke="#333"/>
+<text x="772.7" y="120.9" font-family="Arial" font-size="10" fill="#333">action-chunk model ensemble seed0+se</text>
+<circle cx="800.4" cy="174.3" r="5" fill="#bbb" stroke="#333"/>
+<text x="807.4" y="167.3" font-family="Arial" font-size="10" fill="#333">action-chunk model ensemble seed0+se</text>
+<circle cx="835.2" cy="174.3" r="5" fill="#bbb" stroke="#333"/>
+<text x="842.2" y="167.3" font-family="Arial" font-size="10" fill="#333">action-chunk model ensemble seed0+se</text>
+<circle cx="870.0" cy="174.3" r="5" fill="#bbb" stroke="#333"/>
+<text x="877.0" y="167.3" font-family="Arial" font-size="10" fill="#333">action-chunk model ensemble seed0+wi</text>
 </svg>

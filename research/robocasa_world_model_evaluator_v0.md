@@ -152,3 +152,32 @@ Interpretation:
 - Flow matching did not improve reconstruction quality in this small setup.
 - Residual flow is much better than noise flow, but it mostly preserves the VAE blur and sometimes adds noise/contrast rather than useful detail.
 - A likely next attempt is not a tiny pixel-space flow head, but a stronger spatial decoder: skip-connected latent U-Net, patch-token diffusion/flow over VQ tokens, or training the encoder/decoder and dynamics jointly on multi-step video prediction.
+
+v0.4 RGB refiner trial:
+- Added a conditional U-Net-style deterministic refiner:
+  - `models/robocasa_rgb_refiner.py`
+  - `train/train_robocasa_rgb_refiner.py`
+  - `eval/render_robocasa_rgb_refiner_rollout.py`
+- Setup:
+  - frozen VAE encoder/dynamics/decoder
+  - input: VAE predicted next RGB, predicted next latent, normalized action, task id
+  - output: residual-refined next RGB
+- Run:
+  - `runs/robocasa/world_evaluator/rgb_refiner_opendrawer_task0`
+  - train samples: 957
+  - val samples: 158
+  - train time: 325.7 sec
+  - refiner size: 3.55M params
+  - VAE + refiner size: 7.02M params
+- Result:
+  - prior VAE next-frame PSNR on the same validation target: 14.62 dB
+  - best refiner PSNR: 14.67 dB at step 100
+  - final refiner PSNR: 14.35 dB at step 800
+  - accepted as a marginal early-stopped visual improvement, but not a strong qualitative improvement.
+- Visual comparison:
+  - `runs/robocasa/world_evaluator/rgb_refiner_opendrawer_task0/real_vs_vae_vs_refiner_exp034_ep87.mp4`
+
+Interpretation:
+- A stronger spatial decoder can improve the metric, but the improvement is tiny with the current data/model setup.
+- The refiner overfits quickly: train loss keeps improving while validation PSNR degrades after step 100.
+- Better next steps are early stopping by default, stronger augmentation, more video data, or joint multi-step latent/video training rather than only refining one-step predicted frames.

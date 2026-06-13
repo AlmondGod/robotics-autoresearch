@@ -293,3 +293,34 @@ Interpretation:
 - Multi-task data diversity was high leverage; denser adjacent frames and more parameters were not.
 - Current bottleneck is likely decoder/object-detail modeling, objective choice, or resolution, not raw VAE parameter count.
 - Practical next step before more sweeps: cache preprocessed transition tensors so experiments do not repeatedly decode all videos.
+
+v0.8 longer training trial:
+- Question:
+  - Was the RoboCasa-5 VAE undertrained at 500 steps?
+- Run:
+  - `runs/robocasa/world_evaluator/vae_robocasa5_all_scaled_w512_z256_5min`
+  - same config as current best v0.6:
+    - frame stride: 8
+    - latent_dim: 256
+    - width: 512
+    - train samples: 13,824
+    - val samples: 985
+  - steps: 4000
+  - train time: 283.6 sec
+- PSNR checkpoints:
+  - step 500: 15.55 dB
+  - step 1000: 15.42 dB
+  - step 1500: 15.19 dB
+  - step 2000: 15.24 dB
+  - step 2500: 15.12 dB
+  - step 3000: 15.04 dB
+  - step 3500: 15.07 dB
+  - step 4000: 14.88 dB
+- Result:
+  - rejected for visual quality.
+  - prior v0.6 best at 500 steps remains better: 15.70 dB.
+
+Interpretation:
+- Longer training lowered train loss and improved weighted validation loss until around step 1000, but visual PSNR peaked early and then decayed.
+- The current weighted objective is not aligned enough with visual reconstruction quality for long training.
+- Next visual-quality run should use PSNR/reconstruction-based checkpoint selection, higher reconstruction weight, or a staged objective: first train VAE reconstruction, then add dynamics/progress/success heads.

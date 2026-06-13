@@ -22,6 +22,7 @@ def main() -> None:
     parser.add_argument("--layout", choices=["copy_first", "side_by_side"], default="side_by_side")
     parser.add_argument("--resize", type=int, default=320)
     parser.add_argument("--fps", type=int, default=20)
+    parser.add_argument("--repo-root", default=".", help="Used to repair manifest paths when data is moved to a new machine.")
     args = parser.parse_args()
 
     manifest = _filtered_manifest(Path(args.manifest), args.task_alias)
@@ -35,7 +36,7 @@ def main() -> None:
 
     rows = []
     for task in manifest["tasks"]:
-        dataset_root = Path(task["dataset_path"])
+        dataset_root = _resolve_dataset_root(Path(task["dataset_path"]), Path(args.repo_root))
         episode_paths = sorted((dataset_root / "data" / "chunk-000").glob("episode_*.parquet"))
         kept = 0
         for episode_path in episode_paths:
@@ -85,6 +86,7 @@ def main() -> None:
         "rows": rows,
     }
     (out_dir / "manifest.json").write_text(json.dumps(summary, indent=2, sort_keys=True))
+    _write_metadata_csv(out_dir, rows)
     print(json.dumps({"out_dir": str(out_dir), "clips": len(rows)}, indent=2))
 
 
@@ -101,6 +103,36 @@ def _filtered_manifest(path: Path, aliases: list[str]) -> dict:
 def _prompt(task: dict, task_index: int) -> str:
     description = str(task.get("description") or task.get("alias") or task.get("robocasa_task"))
     return f"Robot manipulation in a RoboCasa kitchen. Task: {description} RoboCasa task_index={task_index}."
+
+
+def _resolve_dataset_root(path: Path, repo_root: Path) -> Path:
+    if path.exists():
+        return path
+    parts = path.parts
+    if "third_party" in parts:
+        suffix = Path(*parts[parts.index("third_party") :])
+        moved = repo_root.resolve() / suffix
+        if moved.exists():
+            return moved
+    raise FileNotFoundError(f"dataset root not found: {path}")
+
+
+def _write_metadata_csv(out_dir: Path, rows: list[dict]) -> None:
+    # Not required by the current Diffusers VideoDataset, but useful for auditing
+    # and compatible with examples that expect a manifest-style CSV.
+    pd.DataFrame(
+        [
+            {
+                "file_name": row["video"],
+                "text": row["prompt"],
+                "task": row["task"],
+                "task_index": row["task_index"],
+                "episode_id": row["episode_id"],
+                "frames": row["frames"],
+            }
+            for row in rows
+        ]
+    ).to_csv(out_dir / "metadata.csv", index=False)
 
 
 def _annotation(frame: pd.DataFrame, *, prompt: str, task: dict, task_index: int, source_episode: int) -> dict:

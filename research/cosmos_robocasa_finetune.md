@@ -83,10 +83,47 @@ PYTHONPATH=. /opt/anaconda3/envs/robocasa/bin/python eval/eval_cosmos_video_qual
 ```
 
 Current blocker:
-- The previous GPU host is not reachable:
-  - `ssh root@216.81.245.138 -p 15521 -i ~/.ssh/id_ed25519`
-  - error: connection refused
-- Local machine is not appropriate for Cosmos 2B post-training.
+- GPU host setup succeeded:
+  - Host: `root@216.81.245.138 -p 12909`
+  - GPU: A100-SXM4-80GB
+  - Workspace: `/workspace/robot-autoresearch-cosmos`
+  - PyTorch upgraded from 2.4.1 to 2.6.0+cu124 because Diffusers Cosmos 2.5 import fails on 2.4.1.
+  - `diffusers==0.38.0` imports `Cosmos2_5_PredictBasePipeline` successfully.
+- RoboCasa Cosmos smoke data was exported on the host:
+  - `data/cosmos_robocasa_action/opendrawer_task0_cosmos_smoke`
+  - 10 OpenDrawer task-index-0 clips
+  - side-by-side left/right camera, 224 px per view, 16 fps
+  - `videos/*.mp4`, `metas/*.txt`, `annotations/*.json`, `metadata.csv`
+- Smallest practical Cosmos 2.5 finetune command attempted:
+
+```bash
+HF_HOME=/workspace/hf_home CUDA_VISIBLE_DEVICES=0 accelerate launch --mixed_precision=bf16 \
+  third_party/diffusers_cosmos/train_cosmos_predict25_lora.py \
+  --pretrained_model_name_or_path nvidia/Cosmos-Predict2.5-2B \
+  --revision diffusers/base/post-trained \
+  --train_data_dir data/cosmos_robocasa_action/opendrawer_task0_cosmos_smoke \
+  --output_dir runs/robocasa/cosmos25_lora/opendrawer_task0_rank4_smoke \
+  --train_batch_size 1 \
+  --num_train_epochs 1 \
+  --checkpointing_epochs 1 \
+  --seed 0 \
+  --height 224 --width 448 --num_frames 49 \
+  --allow_tf32 --gradient_checkpointing \
+  --lora_rank 4 --lora_alpha 4 \
+  --dataloader_num_workers 0 \
+  --report_to tensorboard \
+  --num_inference_steps 8 \
+  --do_final_eval
+```
+
+- Current blocker is Hugging Face authorization, not code/GPU:
+  - `nvidia/Cosmos-Predict2.5-2B` returns `403 Forbidden`.
+  - Message: token is authenticated but "not in the authorized list".
+  - Visit `https://huggingface.co/nvidia/Cosmos-Predict2.5-2B` and request/accept access with the same HF account, then rerun the command above.
+- Also checked older Cosmos base checkpoints:
+  - `nvidia/Cosmos-Predict2-2B-Video2World`: README visible, weights/config gated.
+  - `nvidia/Cosmos-Predict2-2B-Sample-Action-Conditioned`: README visible, weights/config gated.
+- `nvidia/Cosmos-Policy-RoboCasa-Predict2-2B` metadata and a 3.9GB `.pt` checkpoint appear downloadable, but that is the Cosmos Policy path, not the requested Cosmos 2.5 Video2World LoRA finetune path.
 
 Expected resource shape:
 - Cosmos 2B is roughly 2B parameters.

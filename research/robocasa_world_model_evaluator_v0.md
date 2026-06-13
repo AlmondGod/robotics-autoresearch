@@ -255,3 +255,41 @@ Interpretation:
 - OpenDrawer held-out PSNR improves from 15.09 dB in the OpenDrawer-only scaled run to 16.23 dB in the all-task run.
 - Multi-task video data helps more than the earlier flow/refiner heads.
 - Visuals are still blurry, so the next meaningful improvement should target spatial detail: larger image resolution, patch/VQ-token prediction, skip-connected decoder, or multi-step video training.
+
+v0.7 additional scaling attempts:
+- Question:
+  - After the RoboCasa-5 data win, does simply scaling temporal density or model size improve further?
+- Current best before these runs:
+  - run: `runs/robocasa/world_evaluator/vae_robocasa5_all_scaled_w512_z256`
+  - frame stride: 8
+  - model: latent_dim 256, width 512
+  - size: 6.33M params
+  - train samples: 13,824
+  - val samples: 985
+  - aggregate PSNR: 15.70 dB
+- Attempt A: more temporal data + larger model.
+  - run: `runs/robocasa/world_evaluator/vae_robocasa5_stride4_w768_z512`
+  - frame stride: 4
+  - model: latent_dim 512, width 768
+  - size: 10.43M params
+  - train samples: 27,397
+  - val samples: 1,954
+  - train time: 71.8 sec
+  - aggregate PSNR: 15.55 dB
+  - result: rejected; more temporal samples did not beat the stride-8 baseline.
+- Attempt B: larger model only.
+  - run: `runs/robocasa/world_evaluator/vae_robocasa5_stride8_w1024_z512`
+  - frame stride: 8
+  - model: latent_dim 512, width 1024
+  - size: 14.01M params
+  - train samples: 13,824
+  - val samples: 985
+  - train time: 67.1 sec
+  - aggregate PSNR: 15.46 dB
+  - result: rejected; larger capacity alone did not beat the 6.33M baseline.
+
+Interpretation:
+- The scaling law is not monotonic in this tiny setup.
+- Multi-task data diversity was high leverage; denser adjacent frames and more parameters were not.
+- Current bottleneck is likely decoder/object-detail modeling, objective choice, or resolution, not raw VAE parameter count.
+- Practical next step before more sweeps: cache preprocessed transition tensors so experiments do not repeatedly decode all videos.

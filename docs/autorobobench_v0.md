@@ -85,6 +85,12 @@ python -m autorobobench.cli hash-manifest \
 The current repo already has the ingredients for the Phase 1 launch profile:
 
 - RoboCasa seed tasks: `data/robocasa5/manifest.json`
+- frozen RoboCasa BC-5 split:
+  `data/autorobobench/robocasa_bc5_splits.json`
+- RoboCasa BC-5 training entrypoint:
+  `train/train_autorobobench_robocasa_bc5.py`
+- immutable RoboCasa BC-5 success eval entrypoint:
+  `eval/eval_autorobobench_robocasa_bc5.py`
 - BC and policy loops: `train.py`, `train/`, `models/`, `research/`
 - World model evaluator traces:
   `runs/robocasa/world_evaluator/trace_eval_frontier/archive_trace_frontier.jsonl`
@@ -93,3 +99,38 @@ The current repo already has the ingredients for the Phase 1 launch profile:
 The World Model Evaluator track should be scored by decision usefulness:
 correlation with true sim success, ranking accuracy, calibration, and measured
 speedup. Pixel/video prediction loss is diagnostic only.
+
+## Executable RoboCasa BC-5 Track
+
+The v0 executable BC-5 track uses the committed split file. Agents may train on
+any prefix or subset of the train episode IDs, but success is measured only by
+the eval IDs in the split file.
+
+Train a small baseline:
+
+```bash
+python train/train_autorobobench_robocasa_bc5.py \
+  --out-dir runs/autorobobench/robocasa_bc5/baseline \
+  --train-episodes-per-task 4 \
+  --val-episodes-per-task 2 \
+  --steps 200
+```
+
+Evaluate and render one rollout per task:
+
+```bash
+python eval/eval_autorobobench_robocasa_bc5.py \
+  --policy runs/autorobobench/robocasa_bc5/baseline/policy_best.pt \
+  --out runs/autorobobench/robocasa_bc5/baseline/eval_success.json \
+  --eval-episodes-per-task 1 \
+  --render-dir runs/autorobobench/robocasa_bc5/baseline/rollouts \
+  --render-episodes-per-task 1
+```
+
+Visualize an agent run ledger:
+
+```bash
+python -m autorobobench.plot_robocasa_bc5 \
+  --ledger runs/autorobobench/robocasa_bc5_codex/experiments.jsonl \
+  --out-dir runs/autorobobench/robocasa_bc5_codex/plots
+```

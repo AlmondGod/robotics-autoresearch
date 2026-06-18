@@ -33,6 +33,27 @@ python -m autorobobench.cli hash-manifest \
   --out runs/autorobobench/v0_immutable_hashes.json
 ```
 
+Run the executable RoboCasa BC-5 track:
+
+```bash
+python train/train_autorobobench_robocasa_bc5.py \
+  --out-dir runs/autorobobench/robocasa_bc5/baseline \
+  --train-episodes-per-task 4 \
+  --val-episodes-per-task 2 \
+  --steps 200
+
+python eval/eval_autorobobench_robocasa_bc5.py \
+  --policy runs/autorobobench/robocasa_bc5/baseline/policy_best.pt \
+  --out runs/autorobobench/robocasa_bc5/baseline/eval_success.json \
+  --eval-episodes-per-task 1 \
+  --render-dir runs/autorobobench/robocasa_bc5/baseline/rollouts \
+  --render-episodes-per-task 1
+```
+
+The frozen public split is `data/autorobobench/robocasa_bc5_splits.json`:
+episodes `0-79` train, `80-89` validation, and `90-99` eval for each of the
+five RoboCasa tasks.
+
 The active v0 question is:
 
 ```text

@@ -28,6 +28,37 @@ Primary score comes from hidden evaluator reruns, not self-reported metrics.
 
 Improve the BC/VLM policy on the five seed RoboCasa tasks.
 
+Executable v0 files:
+
+- frozen split: `data/autorobobench/robocasa_bc5_splits.json`
+- train entrypoint: `train/train_autorobobench_robocasa_bc5.py`
+- immutable eval entrypoint: `eval/eval_autorobobench_robocasa_bc5.py`
+
+Quick dev command:
+
+```bash
+python train/train_autorobobench_robocasa_bc5.py \
+  --out-dir runs/autorobobench/robocasa_bc5_dev/exp001 \
+  --train-episodes-per-task 1 \
+  --val-episodes-per-task 1 \
+  --steps 50 \
+  --frame-stride 16 \
+  --width 64 \
+  --chunk-horizon 4 \
+  --device cpu
+
+python eval/eval_autorobobench_robocasa_bc5.py \
+  --policy runs/autorobobench/robocasa_bc5_dev/exp001/policy_best.pt \
+  --out runs/autorobobench/robocasa_bc5_dev/exp001/eval_success.json \
+  --eval-episodes-per-task 1 \
+  --max-steps 40 \
+  --commit-steps 4 \
+  --device cpu
+```
+
+For a real run, increase train episodes, steps, model width, and max eval steps.
+Do not change the eval split or immutable eval script.
+
 Good experiment families:
 
 - action chunking and temporal ensembling
@@ -74,17 +105,18 @@ Each experiment row should contain:
 {
   "experiment": 1,
   "commit": "abc1234",
-  "track": "world_model_evaluator",
-  "change": "trace-calibrate VAE evaluator on fold A",
+  "track": "robocasa_bc5",
+  "change": "increase temporal chunk horizon from 4 to 8",
   "train_budget_seconds": 300,
+  "run_dir": "runs/autorobobench/robocasa_bc5_dev/exp001",
+  "history": "runs/autorobobench/robocasa_bc5_dev/exp001/history.json",
+  "eval": "runs/autorobobench/robocasa_bc5_dev/exp001/eval_success.json",
   "metrics": {
-    "wm_spearman": 0.72,
-    "checkpoint_ranking_accuracy": 0.8,
-    "wm_speedup_score": 0.6,
-    "calibration_score": 0.55
+    "success_rate": 0.2,
+    "val_loss": 0.9
   },
   "accepted": true,
-  "notes": "Improves held-out candidate ranking."
+  "notes": "Improves frozen dev success without touching eval."
 }
 ```
 

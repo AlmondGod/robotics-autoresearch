@@ -1,0 +1,278 @@
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import time
+from pathlib import Path
+
+import numpy as np
+import torch
+from torch import nn
+
+from autorobobench.robocasa_runtime import ensure_robocasa_runtime
+from train.common import device_from_arg
+
+
+ensure_robocasa_runtime()
+
+from eval.train_temporal_chunk_bc_robocasa import (  # noqa: E402
+    RoboCasaTemporalChunkBC,
+    TemporalChunkData,
+    _augment,
+    _batch,
+    _concat_parts,
+    _episode_samples,
+    _eval_loss,
+    _flow_matching_loss,
+    _masked_chunk_loss,
+    _masked_mean_std,
+    _mean_std,
+)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Train the AutoroboBench RoboCasa BC-5 baseline policy.")
+    parser.add_argument("--manifest", default="data/robocasa5/manifest.json")
+    parser.add_argument("--split", default="data/autorobobench/robocasa_bc5_splits.json")
+    parser.add_argument("--out-dir", default="runs/autorobobench/robocasa_bc5/baseline")
+    parser.add_argument("--train-episodes-per-task", type=int, default=4)
+    parser.add_argument("--val-episodes-per-task", type=int, default=2)
+    parser.add_argument("--task-alias", action="append", default=[])
+    parser.add_argument("--chunk-horizon", type=int, default=16)
+    parser.add_argument("--frame-stride", type=int, default=2)
+    parser.add_argument("--steps", type=int, default=200)
+    parser.add_argument("--max-train-seconds", type=float, default=0.0)
+    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--width", type=int, default=256)
+    parser.add_argument("--dropout", type=float, default=0.05)
+    parser.add_argument("--lr", type=float, default=2e-4)
+    parser.add_argument("--weight-decay", type=float, default=1e-4)
+    parser.add_argument("--image-noise", type=float, default=0.01)
+    parser.add_argument("--proprio-noise", type=float, default=0.01)
+    parser.add_argument("--action-smooth", type=float, default=0.001)
+    parser.add_argument("--policy-kind", choices=["bc", "flow"], default="bc")
+    parser.add_argument("--flow-steps", type=int, default=8)
+    parser.add_argument("--flow-sigma", type=float, default=1.0)
+    parser.add_argument("--chunk-decay", type=float, default=1.0)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--log-interval", type=int, default=25)
+    parser.add_argument("--device", default="auto")
+    args = parser.parse_args()
+
+    manifest = json.loads(Path(args.manifest).read_text())
+    split = json.loads(Path(args.split).read_text())
+    task_aliases = set(args.task_alias)
+    train_data, val_data, split_summary = load_split_data(
+        manifest,
+        split,
+        task_aliases=task_aliases,
+        train_episodes_per_task=int(args.train_episodes_per_task),
+        val_episodes_per_task=int(args.val_episodes_per_task),
+        chunk_horizon=int(args.chunk_horizon),
+        frame_stride=int(args.frame_stride),
+    )
+    if len(train_data) == 0 or len(val_data) == 0:
+        raise ValueError("need both train and val samples for RoboCasa BC-5")
+
+    proprio_mean, proprio_std = _mean_std(train_data.proprio)
+    action_mean, action_std = _masked_mean_std(train_data.actions, train_data.mask)
+    train_data.proprio = ((train_data.proprio - proprio_mean) / proprio_std).astype(np.float32)
+    val_data.proprio = ((val_data.proprio - proprio_mean) / proprio_std).astype(np.float32)
+    train_data.actions = ((train_data.actions - action_mean) / action_std).astype(np.float32)
+    val_data.actions = ((val_data.actions - action_mean) / action_std).astype(np.float32)
+
+    device = device_from_arg(args.device)
+    model = RoboCasaTemporalChunkBC(
+        proprio_dim=int(train_data.proprio.shape[-1]),
+        chunk_horizon=int(args.chunk_horizon),
+        action_dim=int(train_data.actions.shape[-1]),
+        task_count=max(1, int(max(train_data.task_id.max(initial=0), val_data.task_id.max(initial=0)) + 1)),
+        width=int(args.width),
+        dropout=float(args.dropout),
+    ).to(device)
+    opt = torch.optim.AdamW(model.parameters(), lr=float(args.lr), weight_decay=float(args.weight_decay))
+    rng = np.random.default_rng(int(args.seed))
+    history: list[dict] = []
+    best_val_loss = math.inf
+    best_step = 0
+    best_state: dict[str, torch.Tensor] | None = None
+    start_time = time.monotonic()
+
+    for step in range(1, int(args.steps) + 1):
+        if args.max_train_seconds > 0 and time.monotonic() - start_time >= float(args.max_train_seconds):
+            break
+        idx = rng.integers(0, len(train_data), size=int(args.batch_size))
+        batch = _batch(train_data, idx, device)
+        batch = _augment(batch, float(args.image_noise), float(args.proprio_noise))
+        if args.policy_kind == "flow":
+            loss = _flow_matching_loss(model, batch, sigma=float(args.flow_sigma), chunk_decay=float(args.chunk_decay))
+        else:
+            pred = model(batch["agent"], batch["wrist"], batch["proprio"], batch["task_id"])
+            loss = _masked_chunk_loss(pred, batch["actions"], batch["mask"], chunk_decay=float(args.chunk_decay))
+            if args.action_smooth > 0 and pred.shape[1] > 1:
+                loss = loss + float(args.action_smooth) * (pred[:, 1:] - pred[:, :-1]).square().mean()
+        opt.zero_grad()
+        loss.backward()
+        nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        opt.step()
+
+        row = {"step": step, "train_loss": float(loss.detach().cpu()), "elapsed_seconds": time.monotonic() - start_time}
+        if step == 1 or step % int(args.log_interval) == 0 or step == int(args.steps):
+            val_loss = _eval_loss(
+                model,
+                val_data,
+                device,
+                batch_size=max(64, int(args.batch_size)),
+                policy_kind=str(args.policy_kind),
+                flow_steps=int(args.flow_steps),
+            )
+            row["val_loss"] = val_loss
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                best_step = step
+                best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
+            print(f"step={step} train_loss={row['train_loss']:.6f} val_loss={val_loss:.6f}", flush=True)
+        history.append(row)
+
+    final_val_loss = _eval_loss(
+        model,
+        val_data,
+        device,
+        batch_size=max(64, int(args.batch_size)),
+        policy_kind=str(args.policy_kind),
+        flow_steps=int(args.flow_steps),
+    )
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint = {
+        "state_dict": model.state_dict(),
+        "policy_type": "autorobobench_robocasa_bc5_temporal_chunk",
+        "chunk_horizon": int(args.chunk_horizon),
+        "action_dim": int(train_data.actions.shape[-1]),
+        "proprio_dim": int(train_data.proprio.shape[-1]),
+        "task_count": max(1, int(max(train_data.task_id.max(initial=0), val_data.task_id.max(initial=0)) + 1)),
+        "width": int(args.width),
+        "dropout": float(args.dropout),
+        "policy_kind": str(args.policy_kind),
+        "flow_steps": int(args.flow_steps),
+        "flow_sigma": float(args.flow_sigma),
+        "chunk_decay": float(args.chunk_decay),
+        "condition_on_robocasa_task_index": False,
+        "views": ["robot0_agentview_left", "robot0_agentview_right"],
+        "manifest": str(Path(args.manifest)),
+        "split": str(Path(args.split)),
+        "proprio_mean": proprio_mean,
+        "proprio_std": proprio_std,
+        "action_mean": action_mean,
+        "action_std": action_std,
+    }
+    torch.save(checkpoint, out_dir / "policy.pt")
+    best_checkpoint = dict(checkpoint)
+    if best_state is not None:
+        best_checkpoint["state_dict"] = best_state
+        best_checkpoint["best_step"] = int(best_step)
+        best_checkpoint["best_val_action_mse_normalized"] = float(best_val_loss)
+    torch.save(best_checkpoint, out_dir / "policy_best.pt")
+
+    metrics = {
+        "checkpoint": str(out_dir / "policy.pt"),
+        "best_checkpoint": str(out_dir / "policy_best.pt"),
+        "best_step": int(best_step),
+        "best_val_action_mse_normalized": float(best_val_loss),
+        "final_val_action_mse_normalized": float(final_val_loss),
+        "train_samples": len(train_data),
+        "val_samples": len(val_data),
+        "split_summary": split_summary,
+        "chunk_horizon": int(args.chunk_horizon),
+        "frame_stride": int(args.frame_stride),
+        "train_episodes_per_task": int(args.train_episodes_per_task),
+        "val_episodes_per_task": int(args.val_episodes_per_task),
+        "steps_completed": int(history[-1]["step"] if history else 0),
+        "train_seconds": float(time.monotonic() - start_time),
+        "width": int(args.width),
+        "dropout": float(args.dropout),
+        "lr": float(args.lr),
+        "weight_decay": float(args.weight_decay),
+        "image_noise": float(args.image_noise),
+        "proprio_noise": float(args.proprio_noise),
+        "action_smooth": float(args.action_smooth),
+        "policy_kind": str(args.policy_kind),
+        "flow_steps": int(args.flow_steps),
+        "flow_sigma": float(args.flow_sigma),
+        "chunk_decay": float(args.chunk_decay),
+        "seed": int(args.seed),
+    }
+    (out_dir / "history.json").write_text(json.dumps(history, indent=2) + "\n")
+    (out_dir / "metrics.json").write_text(json.dumps(metrics, indent=2, sort_keys=True) + "\n")
+    print(json.dumps(metrics, indent=2, sort_keys=True))
+
+
+def load_split_data(
+    manifest: dict,
+    split: dict,
+    *,
+    task_aliases: set[str],
+    train_episodes_per_task: int,
+    val_episodes_per_task: int,
+    chunk_horizon: int,
+    frame_stride: int,
+) -> tuple[TemporalChunkData, TemporalChunkData, list[dict]]:
+    manifest_tasks = {task["alias"]: task for task in manifest["tasks"]}
+    train_parts: list[dict[str, np.ndarray]] = []
+    val_parts: list[dict[str, np.ndarray]] = []
+    summary: list[dict] = []
+    for split_task in split["tasks"]:
+        alias = split_task["alias"]
+        if task_aliases and alias not in task_aliases:
+            continue
+        task = manifest_tasks[alias]
+        task_id = int(split_task["task_id"])
+        dataset_root = Path(task["dataset_path"])
+        train_ids = list(split_task["train_episode_ids"])
+        val_ids = list(split_task["val_episode_ids"])
+        if train_episodes_per_task > 0:
+            train_ids = train_ids[:train_episodes_per_task]
+        if val_episodes_per_task > 0:
+            val_ids = val_ids[:val_episodes_per_task]
+        for episode_id in train_ids:
+            episode_path = dataset_root / "data" / "chunk-000" / f"episode_{int(episode_id):06d}.parquet"
+            train_parts.append(
+                _episode_samples(
+                    dataset_root,
+                    episode_path,
+                    int(episode_id),
+                    task_id,
+                    chunk_horizon,
+                    frame_stride,
+                    False,
+                )
+            )
+        for episode_id in val_ids:
+            episode_path = dataset_root / "data" / "chunk-000" / f"episode_{int(episode_id):06d}.parquet"
+            val_parts.append(
+                _episode_samples(
+                    dataset_root,
+                    episode_path,
+                    int(episode_id),
+                    task_id,
+                    chunk_horizon,
+                    frame_stride,
+                    False,
+                )
+            )
+        summary.append(
+            {
+                "alias": alias,
+                "task_id": task_id,
+                "dataset_path": str(dataset_root),
+                "train_episode_ids": [int(x) for x in train_ids],
+                "val_episode_ids": [int(x) for x in val_ids],
+            }
+        )
+        print(f"loaded {alias}: train={train_ids} val={val_ids}", flush=True)
+    return _concat_parts(train_parts), _concat_parts(val_parts), summary
+
+
+if __name__ == "__main__":
+    main()

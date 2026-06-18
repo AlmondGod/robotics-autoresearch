@@ -35,9 +35,10 @@
         "eval/**",
         "data/make_robocasa5.py",
         "data/robocasa5/manifest.json",
+        "data/autorobobench/robocasa_bc5_splits.json",
         "configs/autorobobench_v0.json"
       ],
-      "notes": "Improve a weak language/image/proprio BC policy on the five current RoboCasa seed tasks."
+      "notes": "Executable in v0 through train/train_autorobobench_robocasa_bc5.py and immutable eval/eval_autorobobench_robocasa_bc5.py. Improve a weak image/proprio BC policy on the five current RoboCasa seed tasks."
     },
     {
       "id": "robocasa_long_horizon",

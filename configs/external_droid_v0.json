@@ -1,0 +1,40 @@
+{
+  "id": "droid_external_v0",
+  "name": "DROID external robot-video corpus",
+  "default_root": "data/external/droid",
+  "recommended_debug_source": "hf://datasets/lerobot/droid_100",
+  "official_sources": {
+    "rlds_full": "gs://gresearch/robotics/droid",
+    "rlds_debug_100": "gs://gresearch/robotics/droid_100",
+    "raw_full": "gs://gresearch/robotics/droid_raw",
+    "raw_no_stereo_hd": "gs://gresearch/robotics/droid_raw"
+  },
+  "scales": {
+    "debug_hf_droid100": {
+      "expected_size": "464 MB",
+      "episodes": 100,
+      "purpose": "local smoke tests for video/action dataloading"
+    },
+    "debug_gcs_droid100": {
+      "expected_size": "2 GB",
+      "episodes": 100,
+      "purpose": "RLDS smoke tests using official GCS layout"
+    },
+    "full_rlds": {
+      "expected_size": "1.7 TB",
+      "trajectories": 76000,
+      "hours": 350,
+      "purpose": "large external paired video/action training"
+    },
+    "full_raw_no_stereo": {
+      "expected_size": "5.6 TB",
+      "purpose": "large video-only pretraining without stereo/raw SVO files"
+    }
+  },
+  "usage": {
+    "video_only": true,
+    "paired_actions": true,
+    "final_eval_allowed": false,
+    "recommended_first_run": "python data/prepare_droid_external.py --mode hf-debug --root data/external/droid"
+  }
+}

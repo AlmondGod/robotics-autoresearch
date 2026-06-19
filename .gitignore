@@ -1,6 +1,7 @@
 .venv/
 third_party/
 data/libero_object5/
+data/external/
 runs/*
 !runs/.gitkeep
 *.egg-info/

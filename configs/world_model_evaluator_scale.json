@@ -1,0 +1,76 @@
+{
+  "name": "bc5_heldout_scaled_v0",
+  "manifest": "data/robocasa5/manifest.json",
+  "split": "data/autorobobench/robocasa_bc5_splits.json",
+  "out_dir": "runs/autorobobench/world_model_evaluator/bc5_heldout_scaled",
+  "eval_episodes_per_task": 10,
+  "max_steps": 260,
+  "commit_steps": 16,
+  "candidates": [
+    {
+      "name": "seqflow_weak",
+      "split": "test",
+      "checkpoint": "runs/autorobobench/robocasa_bc5_sequence_flow/seqflow_h16_w256_bcdom_3min_seed1/policy_best.pt"
+    },
+    {
+      "name": "starter_bc5",
+      "split": "test",
+      "checkpoint": "runs/autorobobench/robocasa_bc5_starter/bc5_h16_w512_80demo_seed0/policy_best.pt"
+    },
+    {
+      "name": "history_act",
+      "split": "test",
+      "checkpoint": "runs/autorobobench/robocasa_bc5_history_act/histact_h16_w256_s16_3min_seed0/policy.pt"
+    },
+    {
+      "name": "rgb16_train80",
+      "split": "test",
+      "checkpoint": "runs/autorobobench/robocasa_bc5_trajectory_bank/rgb16_train80_h320/policy.pt"
+    },
+    {
+      "name": "rgb16_trainval90",
+      "split": "test",
+      "checkpoint": "runs/autorobobench/robocasa_bc5_trajectory_bank/rgb16_trainval90_h320/policy.pt"
+    },
+    {
+      "name": "histflow_3min",
+      "split": "test",
+      "checkpoint": "runs/autorobobench/robocasa_bc5_history_flow/histflow_h32_w256_s16_3min_seed0/policy_best.pt"
+    },
+    {
+      "name": "histflow_5min",
+      "split": "test",
+      "checkpoint": "runs/autorobobench/robocasa_bc5_history_flow/histflow_h32_w256_s16_5min_seed0/policy_best.pt"
+    },
+    {
+      "name": "histflow_progress",
+      "split": "test",
+      "checkpoint": "runs/autorobobench/robocasa_bc5_history_flow/histflow_progress_h32_w256_s16_5min_seed0/policy_best.pt"
+    },
+    {
+      "name": "seqflow_residual",
+      "split": "test",
+      "checkpoint": "runs/autorobobench/robocasa_bc5_sequence_flow/seqflow_h32_w256_residual_3min_seed0/policy_best.pt"
+    },
+    {
+      "name": "actinit_res005",
+      "split": "test",
+      "checkpoint": "runs/autorobobench/robocasa_bc5_history_act_flow/actinit_h16_w256_res025_5min_seed0/policy_best_res0p05.pt"
+    },
+    {
+      "name": "trajectory_oracle_exact",
+      "split": "calibration",
+      "checkpoint": "runs/autorobobench/robocasa_bc5_trajectory_bank/dev_oracle_exact_h320/policy.pt"
+    },
+    {
+      "name": "trajectory_oracle_all",
+      "split": "calibration",
+      "checkpoint": "runs/autorobobench/robocasa_bc5_trajectory_bank/dev_oracle_all_h320/policy.pt"
+    }
+  ],
+  "world_evaluators": [
+    "runs/robocasa/world_evaluator/vae_robocasa5_all_scaled_w512_z256_5min/vae_world_model_best.pt",
+    "runs/robocasa/world_evaluator/vae_robocasa5_stride4_w768_z512/vae_world_model_best.pt",
+    "runs/robocasa/world_evaluator/vae_robocasa5_stride8_w1024_z512/vae_world_model_best.pt"
+  ]
+}

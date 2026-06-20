@@ -6,7 +6,7 @@
       "id": "robocasa_bc5",
       "name": "RoboCasa BC-5",
       "phase": 1,
-      "weight": 15,
+      "weight": 30,
       "primary_metric": "hidden_final_success",
       "starter_metric": 0.10,
       "reference_metric": 0.70,
@@ -28,12 +28,9 @@
         "tasks/robocasa_bc5/inference.py",
         "train/**",
         "models/**",
-        "research/**",
-        "configs/robocasa*.json",
         "program_autorobobench.md"
       ],
       "immutable_globs": [
-        "eval/**",
         "tasks/robocasa_bc5/eval.py",
         "tasks/robocasa_bc5/setup.py",
         "tasks/robocasa_bc5/task.json",
@@ -42,13 +39,13 @@
         "data/autorobobench/robocasa_bc5_splits.json",
         "configs/autorobobench_v0.json"
       ],
-      "notes": "Executable in v0 through the task package tasks/robocasa_bc5: setup.py verifies data once, train.py is the editable training entrypoint, inference.py exposes the policy interface, and eval.py is immutable and loads exactly one policy through inference.py. Starter is measured from the canonical BC-5 h16/w512/80-demo run at 5/50 public eval successes. Improve a weak image/proprio BC policy on the five current RoboCasa seed tasks."
+      "notes": "Executable RoboCasa BC-5 track. Improve one policy across the five seed RoboCasa tasks while eval remains fixed."
     },
     {
       "id": "robocasa_long_horizon",
       "name": "Long-Horizon RoboCasa",
       "phase": 1,
-      "weight": 20,
+      "weight": 40,
       "primary_metric": "hidden_final_success",
       "starter_metric": 0.05,
       "reference_metric": 0.55,
@@ -66,170 +63,63 @@
         "reproducibility_integrity"
       ],
       "allowed_edit_globs": [
-        "train.py",
+        "tasks/robocasa_long_horizon/train.py",
+        "tasks/robocasa_long_horizon/inference.py",
         "train/**",
         "models/**",
-        "research/**",
-        "configs/robocasa*.json",
         "program_autorobobench.md"
       ],
       "immutable_globs": [
-        "eval/**",
+        "tasks/robocasa_long_horizon/eval.py",
+        "tasks/robocasa_long_horizon/setup.py",
+        "tasks/robocasa_long_horizon/task.json",
         "data/make_robocasa5.py",
         "data/download_robocasa.py",
+        "data/robocasa5/manifest.json",
+        "data/autorobobench/robocasa_long_horizon_splits.json",
         "configs/autorobobench_v0.json"
       ],
-      "notes": "Compositional manipulation track; v0 can start with available long-horizon RoboCasa tasks or a held-out RoboCasa365 subset."
+      "notes": "Sequential RoboCasa manipulation track over the long-horizon subset of the seed tasks."
     },
     {
-      "id": "world_model_evaluator",
-      "name": "World Model Evaluator",
+      "id": "video_policy_transfer",
+      "name": "Video Data to Policy Transfer",
       "phase": 1,
-      "weight": 20,
-      "primary_metric": "wm_spearman",
-      "starter_metric": 0.20,
-      "reference_metric": 0.90,
+      "weight": 30,
+      "primary_metric": "video_transfer_success",
+      "starter_metric": 0.05,
+      "reference_metric": 0.35,
       "higher_is_better": true,
       "score_weights": {
-        "normalized_primary_progress": 0.40,
-        "checkpoint_ranking_accuracy": 0.20,
-        "wm_speedup_score": 0.20,
-        "calibration_score": 0.10,
+        "normalized_primary_progress": 0.55,
+        "paired_action_efficiency": 0.20,
+        "data_budget_integrity": 0.15,
         "reproducibility_integrity": 0.10
       },
       "required_result_keys": [
-        "wm_spearman",
-        "checkpoint_ranking_accuracy",
-        "wm_speedup_score",
-        "calibration_score",
+        "video_transfer_success",
+        "paired_action_efficiency",
+        "data_budget_integrity",
         "reproducibility_integrity"
       ],
       "allowed_edit_globs": [
-        "tasks/world_model_evaluator/train.py",
-        "train/train_robocasa_vae_world_model.py",
-        "train/train_robocasa_vae_trace_calibrator.py",
-        "train/train_robocasa_mixed_trace_calibrator.py",
-        "train/train_robocasa_tiny_evaluator.py",
-        "models/robocasa_tiny_evaluator.py",
-        "research/robocasa_world_model_evaluator_v0.md",
-        "program_autorobobench.md"
-      ],
-      "immutable_globs": [
-        "tasks/world_model_evaluator/eval.py",
-        "tasks/world_model_evaluator/build_archive.py",
-        "tasks/world_model_evaluator/setup.py",
-        "tasks/world_model_evaluator/task.json",
-        "runs/robocasa/world_evaluator/trace_eval_frontier/archive_trace_frontier.jsonl",
-        "eval/eval_robocasa_tiny_evaluator_correlation.py",
-        "eval/eval_world_model_ranking.py",
-        "configs/autorobobench_v0.json"
-      ],
-      "notes": "Score learned evaluator by policy-ranking correlation, ranking usefulness, calibration, and speedup over simulator."
-    },
-    {
-      "id": "external_data_wall",
-      "name": "External Data / Data Wall",
-      "phase": 2,
-      "weight": 15,
-      "primary_metric": "external_data_value",
-      "starter_metric": 0.00,
-      "reference_metric": 0.25,
-      "higher_is_better": true,
-      "score_weights": {
-        "normalized_primary_progress": 0.50,
-        "heldout_no_regression": 0.20,
-        "data_budget_efficiency": 0.20,
-        "reproducibility_integrity": 0.10
-      },
-      "required_result_keys": [
-        "external_data_value",
-        "heldout_no_regression",
-        "data_budget_efficiency",
-        "reproducibility_integrity"
-      ],
-      "allowed_edit_globs": [
-        "data/**",
+        "tasks/video_policy_transfer/train.py",
+        "tasks/video_policy_transfer/inference.py",
         "train/**",
         "models/**",
-        "research/**",
-        "configs/**",
         "program_autorobobench.md"
       ],
       "immutable_globs": [
-        "eval/**",
+        "tasks/video_policy_transfer/eval.py",
+        "tasks/video_policy_transfer/setup.py",
+        "tasks/video_policy_transfer/task.json",
+        "tasks/robocasa_bc5/eval.py",
+        "data/robocasa5/manifest.json",
+        "data/autorobobench/video_policy_transfer_splits.json",
+        "data/autorobobench/video_policy_transfer_video_pool.json",
         "configs/autorobobench_v0.json"
       ],
-      "notes": "Use fixed OXE/DROID/Bridge/LeRobot-style cached corpora; live network stays disabled by default."
-    },
-    {
-      "id": "sim_rl_improvement",
-      "name": "Sim RL Improvement",
-      "phase": 3,
-      "weight": 15,
-      "primary_metric": "success_auc_under_sim_budget",
-      "starter_metric": 0.25,
-      "reference_metric": 0.70,
-      "higher_is_better": true,
-      "score_weights": {
-        "normalized_primary_progress": 0.45,
-        "hidden_final_success": 0.30,
-        "bc_retention": 0.15,
-        "reproducibility_integrity": 0.10
-      },
-      "required_result_keys": [
-        "success_auc_under_sim_budget",
-        "hidden_final_success",
-        "bc_retention",
-        "reproducibility_integrity"
-      ],
-      "allowed_edit_globs": [
-        "train/**",
-        "models/**",
-        "research/**",
-        "configs/**",
-        "program_autorobobench.md"
-      ],
-      "immutable_globs": [
-        "eval/**",
-        "configs/autorobobench_v0.json"
-      ],
-      "notes": "Improve BC with simulator access under a fixed online interaction budget."
-    },
-    {
-      "id": "transfer_robust_language",
-      "name": "Transfer / Robustness / Language",
-      "phase": 3,
-      "weight": 15,
-      "primary_metric": "hidden_robust_success",
-      "starter_metric": 0.15,
-      "reference_metric": 0.60,
-      "higher_is_better": true,
-      "score_weights": {
-        "hidden_robust_success": 0.50,
-        "language_paraphrase_success": 0.15,
-        "visual_shift_success": 0.15,
-        "object_layout_success": 0.10,
-        "reproducibility_integrity": 0.10
-      },
-      "required_result_keys": [
-        "hidden_robust_success",
-        "language_paraphrase_success",
-        "visual_shift_success",
-        "object_layout_success",
-        "reproducibility_integrity"
-      ],
-      "allowed_edit_globs": [
-        "train/**",
-        "models/**",
-        "research/**",
-        "configs/**",
-        "program_autorobobench.md"
-      ],
-      "immutable_globs": [
-        "eval/**",
-        "configs/autorobobench_v0.json"
-      ],
-      "notes": "Held-out objects, layouts, robot/task variants, and language paraphrases."
+      "notes": "Scarce-action transfer track using two paired demos per task plus an RGB-only RoboCasa video pool."
     }
   ]
 }

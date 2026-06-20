@@ -1,0 +1,42 @@
+{
+  "id": "video_policy_transfer",
+  "name": "Video Data to Policy Transfer",
+  "version": "v0",
+  "setup": "tasks/video_policy_transfer/setup.py",
+  "train": "tasks/video_policy_transfer/train.py",
+  "inference": "tasks/video_policy_transfer/inference.py",
+  "eval": "tasks/video_policy_transfer/eval.py",
+  "manifest": "data/robocasa5/manifest.json",
+  "split": "data/autorobobench/video_policy_transfer_splits.json",
+  "video_pool": "data/autorobobench/video_policy_transfer_video_pool.json",
+  "starter_metric": 0.05,
+  "reference_metric": 0.35,
+  "train_contract": {
+    "single_model": true,
+    "train_tasks": 5,
+    "eval_tasks": 5,
+    "paired_action_demos_per_task": 2,
+    "in_task_video_only_demos_per_task": 78,
+    "total_video_only_demos": 923,
+    "unique_video_to_paired_demo_ratio": 92.3,
+    "video_to_paired_frame_ratio": 109.21986123156982,
+    "video_pool_contains_actions": false,
+    "video_pool_contains_proprio": false,
+    "test_time_demo_access": false,
+    "max_train_seconds": 300,
+    "eval_code_mutable": false
+  },
+  "policy_interface": {
+    "load_policy": "load_policy(checkpoint: str, device: str) -> policy",
+    "act": "act(policy, obs: dict, task: dict) -> np.ndarray[action_horizon, action_dim]"
+  },
+  "default_eval": {
+    "eval_episodes_per_task": 10,
+    "max_steps": 260,
+    "commit_steps": 16
+  },
+  "metrics": {
+    "primary": "video_transfer_success",
+    "secondary": ["success_rate", "paired_action_efficiency", "data_budget_integrity"]
+  }
+}

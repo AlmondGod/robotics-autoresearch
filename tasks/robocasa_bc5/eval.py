@@ -5,11 +5,13 @@ import importlib
 import json
 import os
 import shutil
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) in sys.path:
@@ -22,7 +24,6 @@ from autorobobench.robocasa_runtime import ensure_robocasa_runtime
 ensure_robocasa_runtime()
 
 import robocasa.utils.lerobot_utils as LU  # noqa: E402
-from eval.render_robocasa_openloop_rollout import _compose_frame, _write_mp4  # noqa: E402
 
 
 def main() -> None:
@@ -245,6 +246,53 @@ def _state_from_obs(obs: dict) -> np.ndarray:
             np.asarray(obs["robot0_gripper_qpos"], dtype=np.float32),
         ]
     ).astype(np.float32)
+
+
+def _compose_frame(env, camera: str, width: int, height: int, step_idx: int, success: bool) -> np.ndarray:
+    image = env.sim.render(height=height, width=width, camera_name=camera)[::-1]
+    pil = Image.fromarray(np.asarray(image, dtype=np.uint8))
+    draw = ImageDraw.Draw(pil)
+    bar_color = (38, 150, 78) if success else (190, 55, 45)
+    draw.rectangle([0, 0, pil.width, 10], fill=bar_color)
+    draw.rectangle([10, 16, 250, 46], fill=(255, 255, 255))
+    draw.text((18, 24), f"step {step_idx:03d} | success {int(success)}", fill=(20, 20, 20))
+    return np.asarray(pil, dtype=np.uint8)
+
+
+def _write_mp4(frames: list[np.ndarray], out: Path, fps: int, ffmpeg: str) -> None:
+    if not frames:
+        raise ValueError("no frames to render")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        for idx, frame in enumerate(frames):
+            ppm = tmp_path / f"frame_{idx:04d}.ppm"
+            with ppm.open("wb") as handle:
+                h, w, _ = frame.shape
+                handle.write(f"P6\n{w} {h}\n255\n".encode("ascii"))
+                handle.write(frame.tobytes())
+        subprocess.run(
+            [
+                ffmpeg,
+                "-y",
+                "-framerate",
+                str(fps),
+                "-i",
+                str(tmp_path / "frame_%04d.ppm"),
+                "-vf",
+                "pad=ceil(iw/2)*2:ceil(ih/2)*2",
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                "-movflags",
+                "+faststart",
+                str(out),
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
 
 
 if __name__ == "__main__":

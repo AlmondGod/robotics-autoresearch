@@ -1,4 +1,0 @@
-
-{"config": "/tmp/libero_synth/config.json", "metrics": {"bc_loss": 0.7457728385925293, "change": "synthetic bc smoke", "checkpoint": "/tmp/libero_synth/exp/policy/policy.pt", "created_unix": 1780820312.247562, "method": "bc", "success_rate": null}, "out_dir": "/tmp/libero_synth/exp", "run_id": "20260607T011827Z-bc"}
-{"config": "/tmp/libero_synth/config.json", "metrics": {"bc_loss": 0.7250443696975708, "change": "synthetic bc smoke", "checkpoint": "/tmp/libero_synth/exp2/policy/policy.pt", "created_unix": 1780820387.196089, "method": "bc", "success_rate": null}, "out_dir": "/tmp/libero_synth/exp2", "run_id": "20260607T011945Z-bc"}
-{"config": "configs/libero_v0_bc.json", "metrics": {"bc_loss": 0.017177673056721687, "change": "BC baseline", "checkpoint": "runs/libero/real_bc_baseline/policy/policy.pt", "created_unix": 1780822337.430892, "method": "bc", "success_rate": null}, "out_dir": "runs/libero/real_bc_baseline", "run_id": "20260607T014946Z-bc"}

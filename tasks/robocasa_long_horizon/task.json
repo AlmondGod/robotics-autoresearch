@@ -1,0 +1,42 @@
+{
+  "id": "robocasa_long_horizon",
+  "name": "Long-Horizon Sequential RoboCasa",
+  "version": "v0",
+  "setup": "tasks/robocasa_long_horizon/setup.py",
+  "train": "tasks/robocasa_long_horizon/train.py",
+  "inference": "tasks/robocasa_long_horizon/inference.py",
+  "eval": "tasks/robocasa_long_horizon/eval.py",
+  "manifest": "data/robocasa5/manifest.json",
+  "split": "data/autorobobench/robocasa_long_horizon_splits.json",
+  "starter_metric": 0.05,
+  "reference_metric": 0.55,
+  "train_contract": {
+    "single_model": true,
+    "train_tasks": 3,
+    "eval_tasks": 3,
+    "sequential_multi_stage_tasks": true,
+    "test_time_demo_access": false
+  },
+  "policy_interface": {
+    "load_policy": "load_policy(checkpoint: str, device: str) -> policy",
+    "act": "act(policy, obs: dict, task: dict) -> np.ndarray[action_horizon, action_dim]"
+  },
+  "default_train": {
+    "train_episodes_per_task": 4,
+    "val_episodes_per_task": 2,
+    "chunk_horizon": 32,
+    "frame_stride": 1,
+    "steps": 200,
+    "progress_scale": 750,
+    "eval_commit_steps": 8
+  },
+  "default_eval": {
+    "eval_episodes_per_task": 10,
+    "max_steps": 750,
+    "commit_steps": 8
+  },
+  "metrics": {
+    "primary": "hidden_final_success",
+    "secondary": ["subgoal_progress", "improvement_auc_over_budget", "reproducibility_integrity"]
+  }
+}

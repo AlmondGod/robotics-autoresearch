@@ -1,7 +1,10 @@
 .venv/
 third_party/
-data/libero_object5/
-data/external/
+data/*/
+!data/autorobobench/
+!data/autorobobench/**
+!data/robocasa5/
+!data/robocasa5/**
 runs/*
 !runs/.gitkeep
 *.egg-info/

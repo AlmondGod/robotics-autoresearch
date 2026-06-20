@@ -1,7 +1,7 @@
 [project]
 name = "robot-autoresearch"
 version = "0.1.0"
-description = "Robotics autoresearch harnesses and AutoroboBench utilities."
+description = "AutoroboBench RoboCasa task harnesses and scoring utilities."
 requires-python = ">=3.10"
 dependencies = [
   "numpy>=1.24",
@@ -9,29 +9,23 @@ dependencies = [
 
 [project.optional-dependencies]
 plot = ["matplotlib>=3.8"]
-libero = [
-  "torch>=2.2",
-  "h5py>=3.10",
-  "pillow>=10.0",
-  "tqdm>=4.66",
-]
 robocasa = [
+  "torch>=2.2",
+  "torchvision>=0.17",
   "mujoco==3.3.1",
   "numpy==2.2.5",
   "lerobot>=0.5,<0.6",
   "h5py>=3.16",
-  "scipy>=1.17",
+  "pandas>=2.2",
   "pyarrow>=24",
-]
-
-[tool.setuptools]
-py-modules = [
-  "prepare",
-  "train",
-  "loop_libero",
-  "plot_progress",
+  "scipy>=1.17",
+  "pillow>=10.0",
+  "imageio[ffmpeg]>=2.34",
+  "tqdm>=4.66",
+  "transformers>=4.44",
+  "r3m @ git+https://github.com/facebookresearch/r3m.git",
 ]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["autorobobench*", "data*", "models*", "train*", "eval*", "research*", "tasks*"]
+include = ["autorobobench*", "data*", "models*", "tasks*", "train*"]

@@ -1,55 +1,34 @@
 # AutoroboBench v0
 
-AutoroboBench is a benchmark of robotics research loops.
+AutoroboBench scores robotics research loops under fixed data, compute, and
+evaluation contracts. This repository currently keeps only the executable
+RoboCasa profile so it is easier to migrate the task/data layer later.
 
-The question is:
+## Current Tracks
 
-```text
-Given a fixed robot-learning repo, data budget, compute budget, and hidden eval,
-can an agent make the robot system better?
-```
+`configs/autorobobench_v0.json` defines three tracks totaling 100 points.
 
-It is not primarily a benchmark of final robot skill. It scores autonomous
-research progress: reading the repo, choosing experiments, editing code, running
-bounded trials, keeping improvements, and surviving a clean hidden rerun.
+| ID | Track | Points | Primary metric |
+| --- | --- | ---: | --- |
+| `robocasa_bc5` | RoboCasa BC-5 | 30 | hidden held-out success |
+| `robocasa_long_horizon` | Long-Horizon RoboCasa | 40 | full success plus subgoal progress |
+| `video_policy_transfer` | Video Data to Policy Transfer | 30 | scarce-action success with video-only data |
 
-## Tracks
+The retained public assets are:
 
-`configs/autorobobench_v0.json` defines six tracks and a 100 point score.
-
-| ID | Track | Phase | Points | Primary metric |
-| --- | --- | ---: | ---: | --- |
-| `robocasa_bc5` | RoboCasa BC-5 | 1 | 15 | hidden held-out success |
-| `robocasa_long_horizon` | Long-Horizon RoboCasa | 1 | 20 | full success plus subgoal progress |
-| `world_model_evaluator` | World Model Evaluator | 1 | 20 | policy-ranking correlation and speedup |
-| `external_data_wall` | External Data / Data Wall | 2 | 15 | value of fixed external robot data |
-| `sim_rl_improvement` | Sim RL Improvement | 3 | 15 | success AUC under sim budget |
-| `transfer_robust_language` | Transfer / Robustness / Language | 3 | 15 | hidden robust success |
-
-Phase 1 is the launchable v0 profile for this repo: BC-5, Long-Horizon, and
-World Model Evaluator. Phases 2 and 3 are defined in the score file so the suite
-can grow without changing the scoring contract.
+- `data/robocasa5/manifest.json`
+- `data/autorobobench/robocasa_bc5_splits.json`
+- `data/autorobobench/robocasa_long_horizon_splits.json`
+- `data/autorobobench/video_policy_transfer_splits.json`
+- `data/autorobobench/video_policy_transfer_video_pool.json`
 
 ## Scoring
 
-Each track result is a JSON object with metrics in `[0, 1]`, plus the track's
-primary metric. For primary metrics with known starter/reference targets, the
-score can use:
+Each track result is a JSON object with metrics in `[0, 1]`. The score uses
+the configured weighted component average, with normalized primary progress
+computed against starter and reference metrics.
 
-```text
-normalized_progress =
-  clip((agent_metric - starter_metric) / (reference_metric - starter_metric), 0, 1)
-```
-
-The suite score is:
-
-```text
-AutoroboBench score = sum(track_weight * track_score)
-```
-
-where `track_score` is a weighted component average from the config.
-
-Run a local smoke score:
+Run a local score smoke test:
 
 ```bash
 python -m autorobobench.cli score \
@@ -57,22 +36,7 @@ python -m autorobobench.cli score \
   --results examples/autorobobench_v0_results.json
 ```
 
-## Anti-Cheating Contract
-
-Final scoring should be done by organizer rerun, not by self-reported metrics.
-
-Protocol:
-
-- public train/dev seeds for debugging
-- hidden seeds, objects, layouts, tasks, and canary files for final eval
-- immutable evaluator and data-prep files
-- file hashes for hidden/eval/config artifacts
-- network disabled by default, except fixed external-data tasks
-- submit patch and run log, not claimed score
-- statistical eval over multiple seeds
-- reproducibility/integrity penalties for metric fabrication or eval tampering
-
-Create a local immutable-file hash manifest:
+Create a hash manifest for immutable files:
 
 ```bash
 python -m autorobobench.cli hash-manifest \
@@ -80,42 +44,22 @@ python -m autorobobench.cli hash-manifest \
   --out runs/autorobobench/v0_immutable_hashes.json
 ```
 
-## Current Repo Mapping
+## Task Packages
 
-The current repo already has the ingredients for the Phase 1 launch profile:
+Each task package follows the same contract:
 
-- RoboCasa seed tasks: `data/robocasa5/manifest.json`
-- frozen RoboCasa BC-5 split:
-  `data/autorobobench/robocasa_bc5_splits.json`
-- RoboCasa BC-5 task package:
-  `tasks/robocasa_bc5/`
-- editable RoboCasa BC-5 training entrypoint:
-  `tasks/robocasa_bc5/train.py`
-- editable RoboCasa BC-5 inference interface:
-  `tasks/robocasa_bc5/inference.py`
-- immutable RoboCasa BC-5 setup/eval/spec files:
-  `tasks/robocasa_bc5/setup.py`, `tasks/robocasa_bc5/eval.py`,
-  `tasks/robocasa_bc5/task.json`
-- BC and policy loops: `train.py`, `train/`, `models/`, `research/`
-- World model evaluator traces:
-  `runs/robocasa/world_evaluator/trace_eval_frontier/archive_trace_frontier.jsonl`
-- Ranking metric implementation: `eval/eval_world_model_ranking.py`
+- `setup.py`: verifies public metadata and local datasets
+- `train.py`: editable training entrypoint
+- `inference.py`: policy loading/action interface used by eval
+- `eval.py`: immutable evaluator wrapper
+- `task.json`: task metadata
 
-The World Model Evaluator track should be scored by decision usefulness:
-correlation with true sim success, ranking accuracy, calibration, and measured
-speedup. Pixel/video prediction loss is diagnostic only.
+## RoboCasa BC-5
 
-## Executable RoboCasa BC-5 Track
-
-The v0 executable BC-5 track uses the committed split file. Agents may train on
-any prefix or subset of the train episode IDs, but success is measured only by
-the eval IDs in the split file.
-
-Train a small baseline:
+The BC-5 track uses five RoboCasa tasks with frozen public train/validation/eval
+episode IDs. A small baseline can be trained with:
 
 ```bash
-python tasks/robocasa_bc5/setup.py --verify
-
 python tasks/robocasa_bc5/train.py \
   --out-dir runs/autorobobench/robocasa_bc5/baseline \
   --train-episodes-per-task 4 \
@@ -123,59 +67,31 @@ python tasks/robocasa_bc5/train.py \
   --steps 200
 ```
 
-Evaluate and render one rollout per task:
+Evaluate with:
 
 ```bash
 python tasks/robocasa_bc5/eval.py \
   --policy runs/autorobobench/robocasa_bc5/baseline/policy_best.pt \
   --out runs/autorobobench/robocasa_bc5/baseline/eval_success.json \
-  --eval-episodes-per-task 1 \
-  --render-dir runs/autorobobench/robocasa_bc5/baseline/rollouts \
-  --render-episodes-per-task 1
+  --eval-episodes-per-task 1
 ```
 
-Visualize an agent run ledger:
+## Long-Horizon RoboCasa
+
+The long-horizon track reuses the BC-5 policy interface but evaluates the three
+multi-stage RoboCasa seed tasks with longer rollouts and shorter action commits.
 
 ```bash
-python -m autorobobench.plot_robocasa_bc5 \
-  --ledger runs/autorobobench/robocasa_bc5_codex/experiments.jsonl \
-  --out-dir runs/autorobobench/robocasa_bc5_codex/plots
+python tasks/robocasa_long_horizon/setup.py --verify
+python tasks/robocasa_long_horizon/train.py --steps 200
 ```
 
-### Canonical Starter
+## Video Policy Transfer
 
-The current public BC-5 starter is the chunked BC policy trained with:
+The video-transfer track limits paired-action training to two demos per task and
+exposes a larger RGB-only video pool without actions or proprio.
 
 ```bash
-python tasks/robocasa_bc5/train.py \
-  --out-dir runs/autorobobench/robocasa_bc5_starter/bc5_h16_w512_80demo_seed0 \
-  --train-episodes-per-task 80 \
-  --val-episodes-per-task 10 \
-  --chunk-horizon 16 \
-  --frame-stride 1 \
-  --steps 3000 \
-  --batch-size 128 \
-  --width 512 \
-  --dropout 0.02 \
-  --lr 2e-4 \
-  --image-noise 0.005 \
-  --proprio-noise 0.005 \
-  --action-smooth 0.0005 \
-  --chunk-decay 0.8 \
-  --seed 0
+python tasks/video_policy_transfer/setup.py --verify
+python tasks/video_policy_transfer/train.py --max-train-seconds 300
 ```
-
-Measured public eval result:
-
-```text
-overall: 5/50 = 10%
-OpenDrawer: 1/10
-CloseDrawer: 4/10
-PickPlaceCounterToStove: 0/10
-TurnOffStove: 0/10
-PickPlaceCounterToCabinet: 0/10
-```
-
-This is intentionally nonzero but weak. The benchmark should measure improving
-from `10%` toward stronger cross-task manipulation, not escaping a broken zero
-baseline.

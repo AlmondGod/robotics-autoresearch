@@ -25,9 +25,9 @@ DEFAULT_TASKS = [
     },
     {
         "task_id": 2,
-        "alias": "PickPlaceCounterToStove",
-        "robocasa_task": "PickPlaceCounterToStove",
-        "description": "Pick an object from the counter and place it on the stove.",
+        "alias": "CloseFridge",
+        "robocasa_task": "CloseFridge",
+        "description": "Close a fridge door.",
     },
     {
         "task_id": 3,

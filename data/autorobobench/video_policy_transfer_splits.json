@@ -28,7 +28,7 @@
       "eval_episode_ids": [90, 91, 92, 93, 94, 95, 96, 97, 98, 99]
     },
     {
-      "alias": "PickPlaceCounterToStove",
+      "alias": "CloseFridge",
       "task_id": 2,
       "train_episode_ids": [0, 1],
       "paired_train_episode_ids": [0, 1],

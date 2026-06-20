@@ -65,9 +65,9 @@ def _rewrite_result(out: Path) -> dict | None:
     payload["data_contract"] = {
         "paired_action_demos_per_task": 2,
         "in_task_video_only_demos_per_task": 78,
-        "total_video_only_demos": 923,
-        "video_to_paired_demo_ratio": 92.3,
-        "video_to_paired_frame_ratio": 109.21986123156982,
+        "total_video_only_demos": 817,
+        "video_to_paired_demo_ratio": 81.7,
+        "video_to_paired_frame_ratio": 93.91025641025641,
         "video_pool_contains_actions": False,
         "video_pool_contains_proprio": False,
         "test_time_demo_access": False

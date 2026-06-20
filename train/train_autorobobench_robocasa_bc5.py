@@ -20,6 +20,7 @@ from autorobobench.robocasa_runtime import ensure_robocasa_runtime
 from models.robocasa_sequence_flow import (
     RoboCasaFrozenCLIPFlowPolicy,
     RoboCasaFrozenR3MFlowPolicy,
+    RoboCasaFrozenSmolVLMFlowPolicy,
     RoboCasaHistoryACTFlowPolicy,
     RoboCasaHistoryACTPolicy,
     RoboCasaHistoryFlowPolicy,
@@ -263,6 +264,7 @@ def main() -> None:
             "history_act_flow",
             "frozen_clip_flow",
             "frozen_r3m_flow",
+            "frozen_smolvlm_flow",
             "mini_pi0_act",
             "mini_pi0_act_resnet",
             "mini_pi0",
@@ -375,6 +377,7 @@ def main() -> None:
         "history_act_flow",
         "frozen_clip_flow",
         "frozen_r3m_flow",
+        "frozen_smolvlm_flow",
         "mini_pi0_act",
         "mini_pi0_act_resnet",
         "mini_pi0",
@@ -388,6 +391,19 @@ def main() -> None:
     task_texts = _task_texts_for_split(manifest, split, task_aliases)
     if args.policy_kind == "frozen_clip_flow":
         model = RoboCasaFrozenCLIPFlowPolicy(
+            proprio_dim=int(train_data.proprio.shape[-1]),
+            chunk_horizon=int(args.chunk_horizon),
+            action_dim=int(train_data.actions.shape[-1]),
+            task_count=task_count,
+            task_texts=task_texts,
+            encoder_name=str(args.vlm_encoder_name),
+            width=int(args.width),
+            action_depth=int(args.action_depth),
+            heads=int(args.heads),
+            dropout=float(args.dropout),
+        ).to(device)
+    elif args.policy_kind == "frozen_smolvlm_flow":
+        model = RoboCasaFrozenSmolVLMFlowPolicy(
             proprio_dim=int(train_data.proprio.shape[-1]),
             chunk_horizon=int(args.chunk_horizon),
             action_dim=int(train_data.actions.shape[-1]),
@@ -537,10 +553,14 @@ def main() -> None:
     clip_train_data = None
     clip_val_data = None
     clip_cache_metrics = {"enabled": False}
-    if args.policy_kind in {"frozen_clip_flow", "frozen_r3m_flow"}:
+    if args.policy_kind in {"frozen_clip_flow", "frozen_r3m_flow", "frozen_smolvlm_flow"}:
         cache_start = time.monotonic()
         feature_cache_dir = Path(args.frozen_feature_cache_dir) if args.frozen_feature_cache_dir else None
-        encoder_name = str(args.vlm_encoder_name if args.policy_kind == "frozen_clip_flow" else args.r3m_encoder_name)
+        encoder_name = str(
+            args.r3m_encoder_name
+            if args.policy_kind == "frozen_r3m_flow"
+            else args.vlm_encoder_name
+        )
         clip_train_data = _cache_clip_features(
             model,
             train_data,
@@ -614,11 +634,11 @@ def main() -> None:
             break
         sample_data = (
             clip_train_data
-            if args.policy_kind in {"frozen_clip_flow", "frozen_r3m_flow"} and clip_train_data is not None
+            if args.policy_kind in {"frozen_clip_flow", "frozen_r3m_flow", "frozen_smolvlm_flow"} and clip_train_data is not None
             else train_data
         )
         idx = _sample_indices(sample_data, int(args.batch_size), rng, balanced=bool(args.balanced_sampling))
-        if args.policy_kind in {"frozen_clip_flow", "frozen_r3m_flow"}:
+        if args.policy_kind in {"frozen_clip_flow", "frozen_r3m_flow", "frozen_smolvlm_flow"}:
             batch = _clip_feature_batch(clip_train_data, idx, device)
             batch = _augment_clip_features(batch, float(args.proprio_noise))
             loss = _frozen_clip_flow_matching_loss(
@@ -721,7 +741,7 @@ def main() -> None:
 
         row = {"step": step, "train_loss": float(loss.detach().cpu()), "elapsed_seconds": time.monotonic() - start_time}
         if step == 1 or step % int(args.log_interval) == 0 or step == int(args.steps):
-            if args.policy_kind in {"frozen_clip_flow", "frozen_r3m_flow"}:
+            if args.policy_kind in {"frozen_clip_flow", "frozen_r3m_flow", "frozen_smolvlm_flow"}:
                 val_loss = _eval_clip_feature_loss(
                     model,
                     clip_val_data,
@@ -750,7 +770,7 @@ def main() -> None:
             print(f"step={step} train_loss={row['train_loss']:.6f} val_loss={val_loss:.6f}", flush=True)
         history.append(row)
 
-    if args.policy_kind in {"frozen_clip_flow", "frozen_r3m_flow"}:
+    if args.policy_kind in {"frozen_clip_flow", "frozen_r3m_flow", "frozen_smolvlm_flow"}:
         final_val_loss = _eval_clip_feature_loss(
             model,
             clip_val_data,
@@ -782,6 +802,8 @@ def main() -> None:
         "policy_type": (
             "autorobobench_robocasa_bc5_frozen_clip_flow"
             if args.policy_kind == "frozen_clip_flow"
+            else "autorobobench_robocasa_bc5_frozen_smolvlm_flow"
+            if args.policy_kind == "frozen_smolvlm_flow"
             else "autorobobench_robocasa_bc5_frozen_r3m_flow"
             if args.policy_kind == "frozen_r3m_flow"
             else "autorobobench_robocasa_bc5_history_act"
@@ -1732,7 +1754,7 @@ def _feature_cache_path(
 
 
 def _cache_clip_features(
-    model: RoboCasaFrozenCLIPFlowPolicy | RoboCasaFrozenR3MFlowPolicy,
+    model: RoboCasaFrozenCLIPFlowPolicy | RoboCasaFrozenR3MFlowPolicy | RoboCasaFrozenSmolVLMFlowPolicy,
     data: TemporalChunkData,
     *,
     device: torch.device,
@@ -1937,7 +1959,7 @@ def _history_act_flow_matching_loss(
 
 
 def _frozen_clip_flow_matching_loss(
-    model: RoboCasaFrozenCLIPFlowPolicy | RoboCasaFrozenR3MFlowPolicy,
+    model: RoboCasaFrozenCLIPFlowPolicy | RoboCasaFrozenR3MFlowPolicy | RoboCasaFrozenSmolVLMFlowPolicy,
     batch: dict[str, torch.Tensor],
     *,
     sigma: float,
@@ -2098,7 +2120,7 @@ def _eval_policy_loss(
 
 
 def _eval_clip_feature_loss(
-    model: RoboCasaFrozenCLIPFlowPolicy | RoboCasaFrozenR3MFlowPolicy,
+    model: RoboCasaFrozenCLIPFlowPolicy | RoboCasaFrozenR3MFlowPolicy | RoboCasaFrozenSmolVLMFlowPolicy,
     data: FrozenCLIPFeatureData,
     device: torch.device,
     batch_size: int,
@@ -2136,7 +2158,7 @@ def _eval_clip_feature_loss(
 
 
 def _sample_clip_flow_from_context(
-    model: RoboCasaFrozenCLIPFlowPolicy | RoboCasaFrozenR3MFlowPolicy,
+    model: RoboCasaFrozenCLIPFlowPolicy | RoboCasaFrozenR3MFlowPolicy | RoboCasaFrozenSmolVLMFlowPolicy,
     context: torch.Tensor,
     *,
     horizon: int,
@@ -2163,7 +2185,7 @@ def _sample_clip_flow_from_context(
 
 
 def _checkpoint_state_dict(model: nn.Module, policy_kind: str) -> dict[str, torch.Tensor]:
-    if policy_kind in {"frozen_clip_flow", "frozen_r3m_flow"} and hasattr(model, "head_state_dict"):
+    if policy_kind in {"frozen_clip_flow", "frozen_r3m_flow", "frozen_smolvlm_flow"} and hasattr(model, "head_state_dict"):
         state = model.head_state_dict()
     else:
         state = model.state_dict()

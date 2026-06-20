@@ -23,6 +23,7 @@ ensure_robocasa_runtime()
 from models.robocasa_sequence_flow import (  # noqa: E402
     RoboCasaFrozenCLIPFlowPolicy,
     RoboCasaFrozenR3MFlowPolicy,
+    RoboCasaFrozenSmolVLMFlowPolicy,
     RoboCasaHistoryACTFlowPolicy,
     RoboCasaHistoryACTPolicy,
     RoboCasaHistoryFlowPolicy,
@@ -170,6 +171,31 @@ def load_policy(checkpoint: str, device: str = "auto") -> Policy:
             proprio_mean=_tensor(payload, "proprio_mean", torch_device),
             proprio_std=_tensor(payload, "proprio_std", torch_device),
             mode="frozen_clip_flow",
+        )
+    if payload.get("policy_type") == "autorobobench_robocasa_bc5_frozen_smolvlm_flow":
+        model = RoboCasaFrozenSmolVLMFlowPolicy(
+            proprio_dim=int(payload["proprio_dim"]),
+            chunk_horizon=int(payload["chunk_horizon"]),
+            action_dim=int(payload["action_dim"]),
+            task_count=int(payload["task_count"]),
+            task_texts=list(payload.get("task_texts", [])),
+            encoder_name=str(payload.get("vlm_encoder_name", "HuggingFaceTB/SmolVLM2-500M-Video-Instruct")),
+            width=int(payload.get("width", 256)),
+            action_depth=int(payload.get("action_depth", 2)),
+            heads=int(payload.get("heads", 4)),
+            dropout=float(payload.get("dropout", 0.0)),
+        ).to(torch_device)
+        model.load_head_state_dict(payload["state_dict"])
+        model.eval()
+        return Policy(
+            model=model,
+            checkpoint=payload,
+            device=torch_device,
+            action_mean=_tensor(payload, "action_mean", torch_device),
+            action_std=_tensor(payload, "action_std", torch_device),
+            proprio_mean=_tensor(payload, "proprio_mean", torch_device),
+            proprio_std=_tensor(payload, "proprio_std", torch_device),
+            mode="frozen_smolvlm_flow",
         )
     if payload.get("policy_type") == "autorobobench_robocasa_bc5_frozen_r3m_flow":
         model = RoboCasaFrozenR3MFlowPolicy(
@@ -355,6 +381,7 @@ def act(policy: Policy, obs: dict, task: dict) -> np.ndarray:
         "history_act_flow",
         "frozen_clip_flow",
         "frozen_r3m_flow",
+        "frozen_smolvlm_flow",
         "mini_pi0_act",
         "mini_pi0_act_resnet",
         "mini_pi0",
@@ -429,7 +456,7 @@ def _act_history(policy: Policy, obs: dict, task_id: int) -> np.ndarray:
         prev_proprio_t = (prev_proprio_t - policy.proprio_mean) / policy.proprio_std
         proprio_t = (proprio_t - policy.proprio_mean) / policy.proprio_std
         task_t = torch.as_tensor([task_id], dtype=torch.long, device=device)
-        if policy.mode in {"history_flow", "history_act_flow", "frozen_clip_flow", "frozen_r3m_flow", "mini_pi0", "mini_pi0_resnet"}:
+        if policy.mode in {"history_flow", "history_act_flow", "frozen_clip_flow", "frozen_r3m_flow", "frozen_smolvlm_flow", "mini_pi0", "mini_pi0_resnet"}:
             pred_norm = policy.model.sample_flow(
                 prev_agent_t,
                 prev_wrist_t,

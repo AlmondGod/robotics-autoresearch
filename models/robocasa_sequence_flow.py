@@ -1312,6 +1312,219 @@ class RoboCasaFrozenCLIPFlowPolicy(nn.Module):
         return action
 
 
+class RoboCasaFrozenSmolVLMFlowPolicy(RoboCasaFrozenCLIPFlowPolicy):
+    """Frozen SmolVLM2 image/text encoder with the same BC+flow action head."""
+
+    def __init__(
+        self,
+        *,
+        proprio_dim: int,
+        chunk_horizon: int,
+        action_dim: int,
+        task_count: int,
+        task_texts: list[str],
+        encoder_name: str = "HuggingFaceTB/SmolVLM2-500M-Video-Instruct",
+        width: int = 256,
+        action_depth: int = 2,
+        heads: int = 4,
+        dropout: float = 0.05,
+    ) -> None:
+        nn.Module.__init__(self)
+        if width % heads != 0:
+            raise ValueError(f"width={width} must be divisible by heads={heads}")
+        self.chunk_horizon = int(chunk_horizon)
+        self.action_dim = int(action_dim)
+        self.width = int(width)
+        self.encoder_name = str(encoder_name)
+        self.task_count = int(task_count)
+        self.task_texts = list(task_texts)
+
+        self.vlm, self.processor = self._load_vlm(self.encoder_name)
+        self.vlm.eval()
+        for param in self.vlm.parameters():
+            param.requires_grad = False
+        self.feature_dim = self._infer_feature_dim(self.vlm.config)
+        self.register_buffer("text_features", self._encode_task_texts(self.processor, task_texts), persistent=False)
+
+        self.proprio = nn.Sequential(
+            nn.Linear(3 * proprio_dim, width),
+            nn.SiLU(),
+            nn.Dropout(dropout),
+            nn.Linear(width, width),
+            nn.LayerNorm(width),
+        )
+        self.visual = nn.Sequential(
+            nn.Linear(5 * self.feature_dim, 2 * width),
+            nn.SiLU(),
+            nn.Dropout(dropout),
+            nn.Linear(2 * width, width),
+            nn.LayerNorm(width),
+        )
+        self.task = nn.Embedding(task_count, width)
+        self.context = nn.Sequential(
+            nn.Linear(3 * width, 2 * width),
+            nn.SiLU(),
+            nn.Dropout(dropout),
+            nn.Linear(2 * width, width),
+            nn.LayerNorm(width),
+        )
+
+        self.action_queries = nn.Parameter(torch.zeros(1, chunk_horizon, width))
+        self.bc_blocks = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(
+                d_model=width,
+                nhead=heads,
+                dim_feedforward=4 * width,
+                dropout=dropout,
+                activation="gelu",
+                batch_first=True,
+                norm_first=True,
+            ),
+            num_layers=action_depth,
+        )
+        self.bc_head = nn.Sequential(nn.LayerNorm(width), nn.Linear(width, action_dim))
+
+        self.flow_action_in = nn.Linear(action_dim, width)
+        self.flow_step = nn.Embedding(chunk_horizon, width)
+        self.flow_time = nn.Sequential(nn.Linear(1, width), nn.SiLU(), nn.Linear(width, width))
+        self.flow_cond = nn.Sequential(nn.LayerNorm(width), nn.Linear(width, width), nn.SiLU(), nn.Linear(width, width))
+        self.flow_blocks = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(
+                d_model=width,
+                nhead=heads,
+                dim_feedforward=4 * width,
+                dropout=dropout,
+                activation="gelu",
+                batch_first=True,
+                norm_first=True,
+            ),
+            num_layers=action_depth,
+        )
+        self.flow_head = nn.Sequential(nn.LayerNorm(width), nn.Linear(width, action_dim))
+        nn.init.normal_(self.action_queries, std=0.02)
+
+    @classmethod
+    def _load_vlm(cls, encoder_name: str):
+        cls._patch_transformers_sklearn()
+        from transformers import AutoProcessor
+
+        try:
+            from transformers import AutoModelForImageTextToText
+
+            model_cls = AutoModelForImageTextToText
+        except ImportError:
+            from transformers import AutoModelForMultimodalLM
+
+            model_cls = AutoModelForMultimodalLM
+        processor = AutoProcessor.from_pretrained(encoder_name)
+        model = model_cls.from_pretrained(encoder_name, torch_dtype="auto")
+        return model, processor
+
+    @staticmethod
+    def _infer_feature_dim(config) -> int:
+        for path in (
+            ("vision_config", "hidden_size"),
+            ("text_config", "hidden_size"),
+            ("hidden_size",),
+        ):
+            node = config
+            for key in path:
+                node = getattr(node, key, None)
+                if node is None:
+                    break
+            if isinstance(node, int):
+                return int(node)
+        raise ValueError(f"could not infer SmolVLM hidden size from config={config!r}")
+
+    def train(self, mode: bool = True):
+        nn.Module.train(self, mode)
+        self.vlm.eval()
+        return self
+
+    def head_state_dict(self) -> dict[str, torch.Tensor]:
+        return {key: value for key, value in self.state_dict().items() if not key.startswith("vlm.")}
+
+    def load_head_state_dict(self, state_dict: dict[str, torch.Tensor]) -> None:
+        self.load_state_dict(state_dict, strict=False)
+
+    def encode_images(self, images: torch.Tensor) -> torch.Tensor:
+        if images.max() > 1.5:
+            images = images / 255.0
+        device = next(self.vlm.parameters()).device
+        dtype = next(self.vlm.parameters()).dtype
+        image_processor = getattr(self.processor, "image_processor", None)
+        mean = torch.as_tensor(
+            getattr(image_processor, "image_mean", [0.5, 0.5, 0.5]),
+            dtype=images.dtype,
+            device=images.device,
+        ).view(1, 3, 1, 1)
+        std = torch.as_tensor(
+            getattr(image_processor, "image_std", [0.5, 0.5, 0.5]),
+            dtype=images.dtype,
+            device=images.device,
+        ).view(1, 3, 1, 1)
+        pixel_values = F.interpolate(images, size=(224, 224), mode="bilinear", align_corners=False)
+        pixel_values = ((pixel_values - mean) / std).to(device=device, dtype=dtype)
+        with torch.no_grad():
+            outputs = self.vlm.model.vision_model(pixel_values, patch_attention_mask=None, return_dict=True)
+        features = outputs.last_hidden_state.to(dtype=torch.float32).mean(dim=1)
+        if features.shape[-1] != self.feature_dim:
+            raise ValueError(f"SmolVLM feature dim changed: got {features.shape[-1]}, expected {self.feature_dim}")
+        return F.normalize(features.float(), dim=-1)
+
+    def _encode_task_texts(self, processor, task_texts: list[str]) -> torch.Tensor:
+        return torch.zeros((self.task_count, self.feature_dim), dtype=torch.float32)
+
+    @staticmethod
+    def _tensor_to_pil(images: torch.Tensor):
+        from PIL import Image
+
+        images = images.detach().cpu().clamp(0.0, 1.0)
+        arrays = (images.permute(0, 2, 3, 1).numpy() * 255.0).round().astype("uint8")
+        return [Image.fromarray(array) for array in arrays]
+
+    def _image_prompt(self, text: str) -> str:
+        token = getattr(self.processor, "image_token", "<image>")
+        return f"{token}{text}"
+
+    def _encode_processor_batch(self, prompts: list[str], images) -> torch.Tensor:
+        device = next(self.vlm.parameters()).device
+        dtype = next(self.vlm.parameters()).dtype
+        kwargs = {
+            "text": prompts,
+            "return_tensors": "pt",
+            "padding": True,
+            "truncation": True,
+            "do_image_splitting": False,
+        }
+        if images is not None:
+            kwargs["images"] = [[image] for image in images]
+        inputs = self.processor(**kwargs)
+        inputs = {key: value.to(device) if isinstance(value, torch.Tensor) else value for key, value in inputs.items()}
+        pixel_values = inputs["pixel_values"]
+        patch_mask = None
+        batch_size = pixel_values.shape[0]
+        tile_count = 1
+        if pixel_values.ndim == 5:
+            batch_size, tile_count = pixel_values.shape[:2]
+            pixel_values = pixel_values.reshape(batch_size * tile_count, *pixel_values.shape[2:])
+        with torch.no_grad():
+            outputs = self.vlm.model.vision_model(
+                pixel_values,
+                patch_attention_mask=patch_mask,
+                return_dict=True,
+            )
+        hidden = outputs.last_hidden_state
+        hidden = hidden.to(dtype=torch.float32)
+        pooled = hidden.mean(dim=1)
+        if tile_count > 1:
+            pooled = pooled.reshape(batch_size, tile_count, -1)
+            pooled = pooled.mean(dim=1)
+        if pooled.shape[-1] != self.feature_dim:
+            raise ValueError(f"SmolVLM feature dim changed: got {pooled.shape[-1]}, expected {self.feature_dim}")
+        return pooled.to(dtype=dtype)
+
+
 class RoboCasaFrozenR3MFlowPolicy(nn.Module):
     """Frozen R3M visual encoder with the same small BC+flow action head."""
 

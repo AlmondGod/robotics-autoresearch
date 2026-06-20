@@ -17,6 +17,12 @@
       "paired_action_efficiency": 0.12,
       "data_budget_integrity": 1.0,
       "reproducibility_integrity": 1.0
+    },
+    "robocasa_microwave_peak": {
+      "peak_final_success": 0.40,
+      "reliability_stability": 0.40,
+      "data_budget_integrity": 1.0,
+      "reproducibility_integrity": 1.0
     }
   }
 }

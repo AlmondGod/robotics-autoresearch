@@ -59,23 +59,43 @@ def _rewrite_result(out: Path) -> dict | None:
     if not out.exists():
         return None
     payload = json.loads(out.read_text())
+    split = json.loads((ROOT / FROZEN_SPLIT).read_text())
+    split_task = next(task for task in split["tasks"] if task["alias"] == "TurnOnSinkFaucet")
+    visual_eval_protocol = split.get("visual_eval_protocol")
+    anti_replay_eval_protocol = split.get("anti_replay_eval_protocol")
+    same_sink_protocol = split.get("same_sink_protocol")
     success_rate = float(payload.get("success_rate", 0.0))
     payload["track"] = "robocasa_faucet_peak"
     payload["manifest"] = FROZEN_MANIFEST
     payload["split"] = FROZEN_SPLIT
+    if visual_eval_protocol is not None:
+        payload["visual_eval_protocol"] = visual_eval_protocol
+    if anti_replay_eval_protocol is not None:
+        payload["anti_replay_eval_protocol"] = anti_replay_eval_protocol
+    if same_sink_protocol is not None:
+        payload["same_sink_protocol"] = same_sink_protocol
     payload["peak_final_success"] = success_rate
     payload["reliability_stability"] = success_rate
     payload["data_budget_integrity"] = 1.0
     payload["reproducibility_integrity"] = 1.0
     payload["data_contract"] = {
         "target_task": "TurnOnSinkFaucet",
-        "task_specific_action_demos": 80,
+        "task_specific_action_demos": len(split_task["train_episode_ids"]),
+        "all_target_trajectory_data_available": True,
+        "training_time_eval_trajectory_access": True,
         "generic_video_pool_tasks": 9,
         "generic_video_pool_contains_target_task": False,
         "video_pool_contains_actions": False,
         "video_pool_contains_proprio": False,
         "test_time_demo_access": False,
     }
+    if visual_eval_protocol is not None:
+        payload["data_contract"]["visual_eval_protocol"] = visual_eval_protocol["name"]
+    if anti_replay_eval_protocol is not None:
+        payload["data_contract"]["anti_replay_eval_protocol"] = anti_replay_eval_protocol["name"]
+    if same_sink_protocol is not None:
+        payload["data_contract"]["same_sink_protocol"] = same_sink_protocol["name"]
+        payload["data_contract"]["sink_fixture_key"] = same_sink_protocol["sink_fixture_key"]
     out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
     return payload
 

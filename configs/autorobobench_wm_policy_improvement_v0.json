@@ -1,0 +1,11 @@
+{
+  "version": "autorobobench-wm-policy-improvement-v0",
+  "total_points": 20,
+  "tracks": [
+    {
+      "id": "robocasa_wm_policy_improvement",
+      "task_spec": "tasks/robocasa_wm_policy_improvement/task.json",
+      "weight": 20
+    }
+  ]
+}

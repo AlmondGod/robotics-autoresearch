@@ -428,6 +428,117 @@ class RoboCasaHistoryACTPolicy(nn.Module):
         return self.context_norm(tokens[:, 0])
 
 
+class RoboCasaPatchViTACTPolicy(nn.Module):
+    """Patch-token ViT ACT policy with a conv patch embedding and long action queries."""
+
+    def __init__(
+        self,
+        *,
+        proprio_dim: int,
+        chunk_horizon: int,
+        action_dim: int,
+        task_count: int,
+        width: int = 256,
+        depth: int = 3,
+        action_depth: int = 3,
+        heads: int = 4,
+        dropout: float = 0.05,
+        patch_size: int = 8,
+    ) -> None:
+        super().__init__()
+        if width % heads != 0:
+            raise ValueError(f"width={width} must be divisible by heads={heads}")
+        if 64 % patch_size != 0:
+            raise ValueError(f"patch_size={patch_size} must divide 64")
+        self.chunk_horizon = int(chunk_horizon)
+        self.action_dim = int(action_dim)
+        self.width = int(width)
+        self.patch_size = int(patch_size)
+        patch_count = (64 // int(patch_size)) ** 2
+
+        self.patch_embed = nn.Conv2d(12, width, kernel_size=patch_size, stride=patch_size)
+        self.patch_pos = nn.Parameter(torch.zeros(1, patch_count, width))
+        self.task = nn.Embedding(task_count, width)
+        self.proprio = nn.Sequential(
+            nn.Linear(3 * proprio_dim, width),
+            nn.SiLU(),
+            nn.Dropout(dropout),
+            nn.Linear(width, width),
+            nn.LayerNorm(width),
+        )
+        self.obs_norm = nn.LayerNorm(width)
+        self.obs_blocks = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(
+                d_model=width,
+                nhead=heads,
+                dim_feedforward=4 * width,
+                dropout=dropout,
+                activation="gelu",
+                batch_first=True,
+                norm_first=True,
+            ),
+            num_layers=depth,
+        )
+        self.action_queries = nn.Parameter(torch.zeros(1, chunk_horizon, width))
+        self.action_blocks = nn.TransformerDecoder(
+            nn.TransformerDecoderLayer(
+                d_model=width,
+                nhead=heads,
+                dim_feedforward=4 * width,
+                dropout=dropout,
+                activation="gelu",
+                batch_first=True,
+                norm_first=True,
+            ),
+            num_layers=action_depth,
+        )
+        self.head = nn.Sequential(nn.LayerNorm(width), nn.Linear(width, action_dim))
+
+        nn.init.normal_(self.patch_pos, std=0.02)
+        nn.init.normal_(self.action_queries, std=0.02)
+
+    def forward(
+        self,
+        prev_agent: torch.Tensor,
+        prev_wrist: torch.Tensor,
+        agent: torch.Tensor,
+        wrist: torch.Tensor,
+        prev_proprio: torch.Tensor,
+        proprio: torch.Tensor,
+        task_id: torch.Tensor,
+    ) -> torch.Tensor:
+        obs_tokens = self.encode_obs_tokens(prev_agent, prev_wrist, agent, wrist, prev_proprio, proprio, task_id)
+        queries = self.action_queries.expand(obs_tokens.shape[0], -1, -1)
+        action_tokens = self.action_blocks(queries, obs_tokens)
+        return self.head(action_tokens)
+
+    def encode_obs_tokens(
+        self,
+        prev_agent: torch.Tensor,
+        prev_wrist: torch.Tensor,
+        agent: torch.Tensor,
+        wrist: torch.Tensor,
+        prev_proprio: torch.Tensor,
+        proprio: torch.Tensor,
+        task_id: torch.Tensor,
+    ) -> torch.Tensor:
+        if agent.max() > 1.5:
+            agent = agent / 255.0
+        if wrist.max() > 1.5:
+            wrist = wrist / 255.0
+        if prev_agent.max() > 1.5:
+            prev_agent = prev_agent / 255.0
+        if prev_wrist.max() > 1.5:
+            prev_wrist = prev_wrist / 255.0
+        image = self.patch_embed(torch.cat([prev_agent, prev_wrist, agent, wrist], dim=1))
+        image = image.flatten(2).transpose(1, 2) + self.patch_pos
+        prop = self.proprio(torch.cat([prev_proprio, proprio, proprio - prev_proprio], dim=-1)).unsqueeze(1)
+        task = self.task(task_id).unsqueeze(1)
+        tokens = torch.cat([task, prop, image], dim=1)
+        tokens = self.obs_blocks(tokens)
+        return self.obs_norm(tokens)
+
+
 class RoboCasaHistoryFlowPolicy(nn.Module):
     """History-conditioned rectified-flow action chunk policy."""
 
@@ -1473,7 +1584,71 @@ class RoboCasaFrozenSmolVLMFlowPolicy(RoboCasaFrozenCLIPFlowPolicy):
         return F.normalize(features.float(), dim=-1)
 
     def _encode_task_texts(self, processor, task_texts: list[str]) -> torch.Tensor:
-        return torch.zeros((self.task_count, self.feature_dim), dtype=torch.float32)
+        if len(task_texts) < self.task_count:
+            task_texts = list(task_texts) + [f"robot task {idx}" for idx in range(len(task_texts), self.task_count)]
+        task_texts = task_texts[: self.task_count]
+
+        tokenizer = getattr(processor, "tokenizer", processor)
+        encoded = tokenizer(
+            task_texts,
+            padding=True,
+            truncation=True,
+            return_tensors="pt",
+        )
+        device = next(self.vlm.parameters()).device
+        encoded = {key: value.to(device) if isinstance(value, torch.Tensor) else value for key, value in encoded.items()}
+
+        with torch.no_grad():
+            text_features = self._encode_text_with_vlm(encoded)
+        text_features = self._match_feature_dim(text_features.float())
+        return F.normalize(text_features, dim=-1)
+
+    def _encode_text_with_vlm(self, encoded: dict[str, torch.Tensor]) -> torch.Tensor:
+        if hasattr(self.vlm, "get_text_features"):
+            return self.vlm.get_text_features(**encoded)
+
+        text_model = getattr(getattr(self.vlm, "model", self.vlm), "text_model", None)
+        if text_model is not None:
+            outputs = text_model(
+                input_ids=encoded.get("input_ids"),
+                attention_mask=encoded.get("attention_mask"),
+                return_dict=True,
+            )
+            hidden = outputs.last_hidden_state
+            mask = encoded.get("attention_mask")
+            if mask is None:
+                return hidden.mean(dim=1)
+            mask = mask.to(dtype=hidden.dtype).unsqueeze(-1)
+            return (hidden * mask).sum(dim=1) / mask.sum(dim=1).clamp_min(1.0)
+
+        embeddings = self.vlm.get_input_embeddings()(encoded["input_ids"])
+        mask = encoded.get("attention_mask")
+        if mask is None:
+            return embeddings.mean(dim=1)
+        mask = mask.to(dtype=embeddings.dtype).unsqueeze(-1)
+        return (embeddings * mask).sum(dim=1) / mask.sum(dim=1).clamp_min(1.0)
+
+    def _match_feature_dim(self, features: torch.Tensor) -> torch.Tensor:
+        if features.shape[-1] == self.feature_dim:
+            return features
+        if features.shape[-1] > self.feature_dim:
+            return features[..., : self.feature_dim]
+        pad = self.feature_dim - features.shape[-1]
+        return F.pad(features, (0, pad))
+
+    def context_from_features(
+        self,
+        image_features: torch.Tensor,
+        prev_proprio: torch.Tensor,
+        proprio: torch.Tensor,
+        task_id: torch.Tensor,
+    ) -> torch.Tensor:
+        batch = image_features.shape[0]
+        text = self.text_features.to(device=image_features.device, dtype=image_features.dtype)[task_id]
+        visual = self.visual(torch.cat([image_features.reshape(batch, -1), text], dim=-1))
+        prop = self.proprio(torch.cat([prev_proprio, proprio, proprio - prev_proprio], dim=-1))
+        task = torch.zeros_like(prop)
+        return self.context(torch.cat([visual, prop, task], dim=-1))
 
     @staticmethod
     def _tensor_to_pil(images: torch.Tensor):

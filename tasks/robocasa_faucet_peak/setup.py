@@ -76,7 +76,7 @@ def verify_assets(manifest_path: Path, split_path: Path, video_pool_path: Path, 
             "val_eval": sorted(set(val_ids) & set(eval_ids)),
         }
         bad = {key: value for key, value in overlaps.items() if value}
-        if bad:
+        if bad and not bool(split.get("intentional_train_eval_overlap")):
             raise ValueError(f"split overlap for {alias}: {bad}")
         missing = []
         if verify_files:
@@ -93,6 +93,7 @@ def verify_assets(manifest_path: Path, split_path: Path, video_pool_path: Path, 
                 "train_episodes": len(train_ids),
                 "val_episodes": len(val_ids),
                 "eval_episodes": len(eval_ids),
+                "overlaps": overlaps,
                 "exists": dataset_root.exists(),
             }
         )
@@ -127,8 +128,13 @@ def verify_assets(manifest_path: Path, split_path: Path, video_pool_path: Path, 
         "manifest": str(manifest_path),
         "split": str(split_path),
         "video_pool": str(video_pool_path),
+        "same_sink_protocol": split.get("same_sink_protocol"),
+        "visual_eval_protocol": split.get("visual_eval_protocol"),
+        "anti_replay_eval_protocol": split.get("anti_replay_eval_protocol"),
         "task_count": len(summary),
         "task_specific_action_train_episodes": sum(row["train_episodes"] for row in summary),
+        "all_target_trajectory_data_available": bool(split.get("all_target_trajectory_data_available")),
+        "intentional_train_eval_overlap": bool(split.get("intentional_train_eval_overlap")),
         "generic_video_pool_tasks": len(pool_summary),
         "generic_video_only_episodes": sum(row["video_only_episodes"] for row in pool_summary),
         "video_pool_contains_actions": bool(video_pool.get("contains_actions")),

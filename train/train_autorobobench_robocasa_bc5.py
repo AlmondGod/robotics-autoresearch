@@ -28,6 +28,7 @@ from models.robocasa_sequence_flow import (
     RoboCasaMiniPi0ACTResNetPolicy,
     RoboCasaMiniPi0Policy,
     RoboCasaMiniPi0ResNetPolicy,
+    RoboCasaPatchViTACTPolicy,
     RoboCasaSequenceFlowPolicy,
     RoboCasaTemporalChunkBC,
 )
@@ -269,6 +270,7 @@ def main() -> None:
             "mini_pi0_act_resnet",
             "mini_pi0",
             "mini_pi0_resnet",
+            "vit_act",
         ],
         default="bc",
     )
@@ -382,6 +384,7 @@ def main() -> None:
         "mini_pi0_act_resnet",
         "mini_pi0",
         "mini_pi0_resnet",
+        "vit_act",
     }:
         _attach_history(train_data, int(args.history_stride))
         _attach_history(val_data, int(args.history_stride))
@@ -466,6 +469,18 @@ def main() -> None:
         ).to(device)
     elif args.policy_kind == "mini_pi0":
         model = RoboCasaMiniPi0Policy(
+            proprio_dim=int(train_data.proprio.shape[-1]),
+            chunk_horizon=int(args.chunk_horizon),
+            action_dim=int(train_data.actions.shape[-1]),
+            task_count=task_count,
+            width=int(args.width),
+            depth=int(args.transformer_depth),
+            action_depth=int(args.action_depth),
+            heads=int(args.heads),
+            dropout=float(args.dropout),
+        ).to(device)
+    elif args.policy_kind == "vit_act":
+        model = RoboCasaPatchViTACTPolicy(
             proprio_dim=int(train_data.proprio.shape[-1]),
             chunk_horizon=int(args.chunk_horizon),
             action_dim=int(train_data.actions.shape[-1]),
@@ -660,7 +675,7 @@ def main() -> None:
                 chunk_decay=float(args.chunk_decay),
                 time_sampling=str(args.flow_time_sampling),
             )
-        elif args.policy_kind in {"mini_pi0_act", "mini_pi0_act_resnet"}:
+        elif args.policy_kind in {"mini_pi0_act", "mini_pi0_act_resnet", "vit_act"}:
             batch = _history_batch(train_data, idx, device)
             batch = _augment_history(batch, float(args.image_noise), float(args.proprio_noise))
             pred = model(
@@ -816,6 +831,8 @@ def main() -> None:
             if args.policy_kind == "mini_pi0_resnet"
             else "autorobobench_robocasa_bc5_mini_pi0"
             if args.policy_kind == "mini_pi0"
+            else "autorobobench_robocasa_bc5_vit_act"
+            if args.policy_kind == "vit_act"
             else "autorobobench_robocasa_bc5_history_act_flow"
             if args.policy_kind == "history_act_flow"
             else "autorobobench_robocasa_bc5_history_flow"
@@ -843,6 +860,7 @@ def main() -> None:
         "transformer_depth": int(args.transformer_depth),
         "action_depth": int(args.action_depth),
         "heads": int(args.heads),
+        "patch_size": 8 if args.policy_kind == "vit_act" else None,
         "vlm_encoder_name": str(args.vlm_encoder_name),
         "r3m_encoder_name": str(args.r3m_encoder_name),
         "task_texts": task_texts,
@@ -2068,7 +2086,7 @@ def _eval_policy_loss(
                 denom = denom + batch["mask"].sum()
         model.train()
         return float((total / denom.clamp_min(1.0)).detach().cpu())
-    if policy_kind in {"history_act", "mini_pi0_act", "mini_pi0_act_resnet"}:
+    if policy_kind in {"history_act", "mini_pi0_act", "mini_pi0_act_resnet", "vit_act"}:
         model.eval()
         total = torch.tensor(0.0, device=device)
         denom = torch.tensor(0.0, device=device)

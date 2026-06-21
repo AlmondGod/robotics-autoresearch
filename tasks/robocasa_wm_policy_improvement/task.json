@@ -1,0 +1,93 @@
+{
+  "id": "robocasa_wm_policy_improvement",
+  "name": "RoboCasa Frozen World-Model Policy Improvement",
+  "version": "v0",
+  "setup": "tasks/robocasa_wm_policy_improvement/setup.py",
+  "train": "tasks/robocasa_wm_policy_improvement/train.py",
+  "inference": "tasks/robocasa_wm_policy_improvement/inference.py",
+  "eval": "tasks/robocasa_wm_policy_improvement/eval.py",
+  "manifest": "data/robocasa5/manifest.json",
+  "split": "data/autorobobench/robocasa_bc5_splits.json",
+  "starter_metric": 0.0,
+  "reference_metric": 0.6,
+  "benchmark": {
+    "phase": 1,
+    "primary_metric": "success_rate",
+    "starter_metric": 0.0,
+    "reference_metric": 0.6,
+    "higher_is_better": true,
+    "score_weights": {
+      "success_rate": 1.0
+    },
+    "required_result_keys": [
+      "success_rate",
+      "episodes",
+      "successes"
+    ],
+    "allowed_edit_globs": [
+      "tasks/robocasa_wm_policy_improvement/train.py",
+      "tasks/robocasa_wm_policy_improvement/inference.py",
+      "tasks/robocasa_wm_policy_improvement/setup.py",
+      "train/**",
+      "models/**",
+      "program_autorobobench.md"
+    ],
+    "immutable_globs": [
+      "tasks/robocasa_wm_policy_improvement/eval.py",
+      "tasks/robocasa_wm_policy_improvement/task.json",
+      "tasks/robocasa_bc5/eval.py",
+      "tasks/robocasa_bc5/inference.py",
+      "data/robocasa5/manifest.json",
+      "data/autorobobench/robocasa_bc5_splits.json"
+    ],
+    "notes": "Improve a pretrained BC policy using a frozen RoboCasa world model. Final score is real RoboCasa rollout success, not the world-model objective."
+  },
+  "train_contract": {
+    "input_policy": "BC5-compatible pretrained policy checkpoint",
+    "input_world_model": "RoboCasaWorldModel or VisualRoboCasaWorldModel checkpoint predicting next_state, next_progress, reward, success, and optionally next_rgb",
+    "world_model_is_frozen": true,
+    "policy_warm_start_required": true,
+    "training_objective": [
+      "maximize frozen-WM predicted reward/progress/success over short action rollouts",
+      "retain behavior-cloning anchor on labeled demonstrations",
+      "retain anchor to the pretrained policy to reduce world-model exploitation"
+    ],
+    "output": "BC5-compatible policy.pt and policy_best.pt",
+    "primary_eval": "real RoboCasa simulator success rate via BC5 evaluator",
+    "supported_policy_modes_v0": [
+      "temporal_chunk_bc",
+      "temporal_chunk_flow",
+      "sequence_flow"
+    ],
+    "unsupported_policy_modes_v0": [
+      "history policies",
+      "frozen VLM feature-cache policies"
+    ]
+  },
+  "default_train": {
+    "train_episodes_per_task": 4,
+    "val_episodes_per_task": 2,
+    "chunk_horizon": 16,
+    "frame_stride": 2,
+    "steps": 500,
+    "max_train_seconds": 300,
+    "batch_size": 64,
+    "wm_rollout_horizon": 4,
+    "wm_success_weight": 1.0,
+    "wm_reward_weight": 0.2,
+    "wm_progress_weight": 0.4,
+    "bc_weight": 0.5,
+    "init_anchor_weight": 0.25,
+    "action_l2_weight": 0.01
+  },
+  "metrics": {
+    "primary": "success_rate",
+    "secondary": [
+      "best_val_policy_improvement_score",
+      "val_wm_objective",
+      "val_action_mse_normalized",
+      "val_init_anchor_mse",
+      "steps_completed"
+    ]
+  }
+}

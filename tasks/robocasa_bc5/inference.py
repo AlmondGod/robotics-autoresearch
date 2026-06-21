@@ -31,6 +31,7 @@ from models.robocasa_sequence_flow import (  # noqa: E402
     RoboCasaMiniPi0ACTResNetPolicy,
     RoboCasaMiniPi0Policy,
     RoboCasaMiniPi0ResNetPolicy,
+    RoboCasaPatchViTACTPolicy,
     RoboCasaSequenceFlowPolicy,
     RoboCasaTemporalChunkBC,
 )
@@ -318,6 +319,31 @@ def load_policy(checkpoint: str, device: str = "auto") -> Policy:
             proprio_std=_tensor(payload, "proprio_std", torch_device),
             mode="mini_pi0_resnet",
         )
+    if payload.get("policy_type") == "autorobobench_robocasa_bc5_vit_act":
+        model = RoboCasaPatchViTACTPolicy(
+            proprio_dim=int(payload["proprio_dim"]),
+            chunk_horizon=int(payload["chunk_horizon"]),
+            action_dim=int(payload["action_dim"]),
+            task_count=int(payload["task_count"]),
+            width=int(payload.get("width", 256)),
+            depth=int(payload.get("transformer_depth", 3)),
+            action_depth=int(payload.get("action_depth", 3)),
+            heads=int(payload.get("heads", 4)),
+            dropout=float(payload.get("dropout", 0.0)),
+            patch_size=int(payload.get("patch_size", 8) or 8),
+        ).to(torch_device)
+        model.load_state_dict(payload["state_dict"])
+        model.eval()
+        return Policy(
+            model=model,
+            checkpoint=payload,
+            device=torch_device,
+            action_mean=_tensor(payload, "action_mean", torch_device),
+            action_std=_tensor(payload, "action_std", torch_device),
+            proprio_mean=_tensor(payload, "proprio_mean", torch_device),
+            proprio_std=_tensor(payload, "proprio_std", torch_device),
+            mode="vit_act",
+        )
     if payload.get("policy_type") == "autorobobench_robocasa_bc5_history_flow":
         model = RoboCasaHistoryFlowPolicy(
             proprio_dim=int(payload["proprio_dim"]),
@@ -386,6 +412,7 @@ def act(policy: Policy, obs: dict, task: dict) -> np.ndarray:
         "mini_pi0_act_resnet",
         "mini_pi0",
         "mini_pi0_resnet",
+        "vit_act",
     }:
         return _act_history(policy, obs, task_id)
 

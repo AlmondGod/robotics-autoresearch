@@ -3,6 +3,7 @@ third_party/
 data/*/
 !data/autorobobench/
 !data/autorobobench/**
+data/autorobobench/feature_cache/
 !data/robocasa5/
 !data/robocasa5/**
 runs/*

@@ -78,9 +78,13 @@ def main() -> None:
             "robocasa_task": manifest_task.get("robocasa_task", alias),
         }
         for local_idx, episode_id in enumerate(episode_ids):
+            reset_state_index = _reset_state_index_for(split_task, int(episode_id))
+            reset_perturbation = _reset_perturbation_for(split_task, int(episode_id))
             frames, success, steps, actions, success_trace = _rollout_episode(
                 dataset_root=dataset_root,
                 episode_idx=int(episode_id),
+                reset_state_index=reset_state_index,
+                reset_perturbation=reset_perturbation,
                 policy=policy,
                 inference=inference,
                 task=task,
@@ -97,6 +101,10 @@ def main() -> None:
                 "success": bool(success),
                 "steps": int(steps),
             }
+            if reset_state_index:
+                row["reset_state_index"] = int(reset_state_index)
+            if reset_perturbation:
+                row["reset_perturbation"] = _summarize_perturbation(reset_perturbation)
             if args.trace_dir:
                 trace_path = (
                     Path(args.trace_dir)
@@ -109,6 +117,8 @@ def main() -> None:
                     task_alias=np.asarray([alias]),
                     task_id=np.asarray([int(split_task["task_id"])], dtype=np.int64),
                     episode_id=np.asarray([int(episode_id)], dtype=np.int64),
+                    reset_state_index=np.asarray([int(reset_state_index)], dtype=np.int64),
+                    reset_perturbation=np.asarray([json.dumps(_summarize_perturbation(reset_perturbation))]),
                     actions=np.asarray(actions, dtype=np.float32),
                     success=np.asarray(success_trace, dtype=np.float32),
                     final_success=np.asarray([float(success)], dtype=np.float32),
@@ -155,6 +165,8 @@ def _rollout_episode(
     *,
     dataset_root: Path,
     episode_idx: int,
+    reset_state_index: int,
+    reset_perturbation: dict,
     policy,
     inference,
     task: dict,
@@ -177,12 +189,22 @@ def _rollout_episode(
     env_kwargs["use_camera_obs"] = False
     env = robosuite.make(**env_kwargs)
 
+    states = LU.get_episode_states(dataset_root, episode_idx)
+    reset_idx = int(np.clip(int(reset_state_index), 0, max(0, len(states) - 1)))
     reset_to(
         env,
         {
             "model": LU.get_episode_model_xml(dataset_root, episode_idx),
             "ep_meta": json.dumps(LU.get_episode_meta(dataset_root, episode_idx)),
-            "states": LU.get_episode_states(dataset_root, episode_idx)[0],
+        },
+    )
+    state = np.asarray(states[reset_idx], dtype=np.float64).copy()
+    if reset_perturbation:
+        state = _apply_state_perturbation(env, state, reset_perturbation, episode_idx)
+    reset_to(
+        env,
+        {
+            "states": state,
         },
     )
 
@@ -236,6 +258,63 @@ def _rollout_episode(
         except Exception:
             pass
     return frames, success, step_idx, actions_applied, success_trace
+
+
+def _reset_state_index_for(split_task: dict, episode_id: int) -> int:
+    overrides = split_task.get("eval_reset_state_indices", {})
+    if not overrides:
+        return 0
+    if isinstance(overrides, dict):
+        value = overrides.get(str(int(episode_id)), overrides.get(int(episode_id), 0))
+        return max(0, int(value or 0))
+    for row in overrides:
+        if int(row.get("episode_id", -1)) == int(episode_id):
+            return max(0, int(row.get("reset_state_index", row.get("state_index", 0)) or 0))
+    return 0
+
+
+def _reset_perturbation_for(split_task: dict, episode_id: int) -> dict:
+    overrides = split_task.get("eval_reset_perturbations", {})
+    if not overrides:
+        return {}
+    if isinstance(overrides, dict):
+        value = overrides.get(str(int(episode_id)), overrides.get(int(episode_id), {}))
+        return dict(value or {})
+    for row in overrides:
+        if int(row.get("episode_id", -1)) == int(episode_id):
+            return dict(row)
+    return {}
+
+
+def _apply_state_perturbation(env, state: np.ndarray, spec: dict, episode_idx: int) -> np.ndarray:
+    out = np.asarray(state, dtype=np.float64).copy()
+    qpos_indices = [int(x) for x in spec.get("qpos_indices", [])]
+    qpos_noise_std = float(spec.get("qpos_noise_std", 0.0) or 0.0)
+    qpos_noise_clip = float(spec.get("qpos_noise_clip", 0.0) or 0.0)
+    if qpos_indices and qpos_noise_std > 0:
+        nq = int(env.sim.model.nq)
+        seed = int(spec.get("seed", 0)) + int(episode_idx) * 1009
+        rng = np.random.default_rng(seed)
+        delta = rng.normal(loc=0.0, scale=qpos_noise_std, size=len(qpos_indices))
+        if qpos_noise_clip > 0:
+            delta = np.clip(delta, -qpos_noise_clip, qpos_noise_clip)
+        for local_idx, qpos_idx in enumerate(qpos_indices):
+            if 0 <= qpos_idx < nq:
+                out[1 + qpos_idx] += float(delta[local_idx])
+    return out
+
+
+def _summarize_perturbation(spec: dict) -> dict:
+    out = {
+        "type": spec.get("type", "qpos_noise"),
+        "seed": int(spec.get("seed", 0)),
+        "qpos_indices": [int(x) for x in spec.get("qpos_indices", [])],
+        "qpos_noise_std": float(spec.get("qpos_noise_std", 0.0) or 0.0),
+        "qpos_noise_clip": float(spec.get("qpos_noise_clip", 0.0) or 0.0),
+    }
+    if "description" in spec:
+        out["description"] = str(spec["description"])
+    return out
 
 
 def _resolve_commit_steps(

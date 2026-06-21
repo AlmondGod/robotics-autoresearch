@@ -25,6 +25,7 @@ generated run artifacts have been removed.
 | Long-Horizon RoboCasa | `tasks/robocasa_long_horizon/` | `data/autorobobench/robocasa_long_horizon_splits.json` |
 | Video Data to Policy Transfer | `tasks/video_policy_transfer/` | `data/autorobobench/video_policy_transfer_splits.json` and `data/autorobobench/video_policy_transfer_video_pool.json` |
 | RoboCasa World Model Policy Correlation | `tasks/robocasa_world_model/` | `data/autorobobench/robocasa_world_model_policy_set.json` |
+| RoboCasa Choose Measuring Cup Language | `tasks/robocasa_choose_measuring_cup_language/` | `data/autorobobench/robocasa_choose_measuring_cup_language_splits.json` |
 
 ## Setup
 

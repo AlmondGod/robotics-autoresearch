@@ -38,6 +38,8 @@
       "tasks/robocasa_world_model/policy_set.py",
       "tasks/robocasa_world_model/trace.py",
       "tasks/robocasa_world_model/plot_eval.py",
+      "tasks/robocasa_world_model/video_repr.py",
+      "tasks/robocasa_world_model/inverse_dynamics.py",
       "train/**",
       "models/**",
       "program_autorobobench.md"
@@ -62,6 +64,7 @@
     "latent_prediction_allowed": true,
     "vae_allowed": true,
     "optional_action_free_video_pool": true,
+    "optional_video_representation_pretraining": true,
     "default_action_labeled_train_rollouts_per_task": 20,
     "optional_in_task_video_only_episodes_per_task": 60,
     "optional_related_video_only_episodes": 427,
@@ -84,7 +87,10 @@
     "frame_stride": 1,
     "steps": 2000,
     "latent_dim": 0,
-    "video_episodes_per_task": 0
+    "video_episodes_per_task": 0,
+    "video_repr_pretrain_steps": 0,
+    "video_align_weight": 0.0,
+    "inverse_align_weight": 0.0
   },
   "metrics": {
     "primary": "world_model_benchmark_score",

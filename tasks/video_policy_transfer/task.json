@@ -19,9 +19,9 @@
     "higher_is_better": true,
     "score_weights": {
       "normalized_primary_progress": 0.55,
-      "paired_action_efficiency": 0.20,
+      "paired_action_efficiency": 0.2,
       "data_budget_integrity": 0.15,
-      "reproducibility_integrity": 0.10
+      "reproducibility_integrity": 0.1
     },
     "required_result_keys": [
       "video_transfer_success",
@@ -54,9 +54,9 @@
     "eval_tasks": 5,
     "paired_action_demos_per_task": 2,
     "in_task_video_only_demos_per_task": 78,
-    "total_video_only_demos": 817,
-    "unique_video_to_paired_demo_ratio": 81.7,
-    "video_to_paired_frame_ratio": 93.91025641025641,
+    "total_video_only_demos": 924,
+    "unique_video_to_paired_demo_ratio": 92.4,
+    "video_to_paired_frame_ratio": 103.75103391232423,
     "video_pool_contains_actions": false,
     "video_pool_contains_proprio": false,
     "test_time_demo_access": false,
@@ -65,7 +65,8 @@
   },
   "policy_interface": {
     "load_policy": "load_policy(checkpoint: str, device: str) -> policy",
-    "act": "act(policy, obs: dict, task: dict) -> np.ndarray[action_horizon, action_dim]"
+    "act": "act(policy, obs: dict, task: dict) -> np.ndarray[action_horizon, action_dim]",
+    "commit_steps": "optional commit_steps(policy, task: dict, action_chunk: np.ndarray, default_commit_steps: int) -> int"
   },
   "default_eval": {
     "eval_episodes_per_task": 10,
@@ -74,6 +75,10 @@
   },
   "metrics": {
     "primary": "video_transfer_success",
-    "secondary": ["success_rate", "paired_action_efficiency", "data_budget_integrity"]
+    "secondary": [
+      "success_rate",
+      "paired_action_efficiency",
+      "data_budget_integrity"
+    ]
   }
 }

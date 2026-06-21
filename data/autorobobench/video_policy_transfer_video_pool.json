@@ -8,11 +8,11 @@
   "contains_proprio": false,
   "contains_rgb_video": true,
   "paired_action_demo_count": 10,
-  "video_only_demo_count": 817,
-  "unique_video_to_paired_ratio": 81.7,
+  "video_only_demo_count": 924,
+  "unique_video_to_paired_ratio": 92.4,
   "paired_action_frame_count": 2418,
-  "video_only_frame_count": 227075,
-  "video_to_paired_frame_ratio": 93.91025641025641,
+  "video_only_frame_count": 250870,
+  "video_to_paired_frame_ratio": 103.75103391232423,
   "tasks": [
     {
       "alias": "OpenDrawer",
@@ -76,12 +76,19 @@
       "dataset_path": "third_party/robocasa/datasets/v1.0/pretrain/atomic/PickPlaceCounterToMicrowave/20250819/lerobot",
       "description": "Pick an object from the counter and place it into a microwave.",
       "video_episode_range": [0, 109]
+    },
+    {
+      "alias": "TurnOnSinkFaucet",
+      "task_id": 105,
+      "dataset_path": "third_party/robocasa/datasets/v1.0/pretrain/atomic/TurnOnSinkFaucet/20250819/lerobot",
+      "description": "Turn on a sink faucet.",
+      "video_episode_range": [0, 106]
     }
   ],
   "notes": [
     "This manifest is the intended interface for video-only methods in this track.",
     "It intentionally omits parquet paths, action keys, state keys, and any action-bearing file references.",
     "The underlying local RoboCasa install may contain actions for these episodes, but benchmark-compliant agents should not access them.",
-    "The demo-count ratio is 81.7x, but the benchmark target is frame/time ratio; the verified frame ratio is above 90x."
+    "The demo-count ratio is 92.4x, but the benchmark target is frame/time ratio; the verified frame ratio is above 100x."
   ]
 }

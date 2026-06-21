@@ -19,8 +19,8 @@
     "score_weights": {
       "hidden_final_success": 0.55,
       "subgoal_progress": 0.25,
-      "improvement_auc_over_budget": 0.10,
-      "reproducibility_integrity": 0.10
+      "improvement_auc_over_budget": 0.1,
+      "reproducibility_integrity": 0.1
     },
     "required_result_keys": [
       "hidden_final_success",
@@ -56,7 +56,8 @@
   },
   "policy_interface": {
     "load_policy": "load_policy(checkpoint: str, device: str) -> policy",
-    "act": "act(policy, obs: dict, task: dict) -> np.ndarray[action_horizon, action_dim]"
+    "act": "act(policy, obs: dict, task: dict) -> np.ndarray[action_horizon, action_dim]",
+    "commit_steps": "optional commit_steps(policy, task: dict, action_chunk: np.ndarray, default_commit_steps: int) -> int"
   },
   "default_train": {
     "train_episodes_per_task": 4,
@@ -74,6 +75,10 @@
   },
   "metrics": {
     "primary": "hidden_final_success",
-    "secondary": ["subgoal_progress", "improvement_auc_over_budget", "reproducibility_integrity"]
+    "secondary": [
+      "subgoal_progress",
+      "improvement_auc_over_budget",
+      "reproducibility_integrity"
+    ]
   }
 }

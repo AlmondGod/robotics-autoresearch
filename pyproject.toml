@@ -19,6 +19,7 @@ robotwin-offline = [
 robocasa = [
   "torch>=2.2",
   "torchvision>=0.17",
+  "lpips>=0.1.4",
   "mujoco==3.3.1",
   "numpy==2.2.5",
   "lerobot>=0.5,<0.6",

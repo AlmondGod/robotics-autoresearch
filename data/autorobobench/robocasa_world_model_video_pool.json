@@ -10,8 +10,8 @@
   "contains_rgb_video": true,
   "default_action_train_rollouts_per_task": 20,
   "in_task_video_only_demo_count": 300,
-  "related_task_video_only_demo_count": 427,
-  "video_only_demo_count": 727,
+  "related_task_video_only_demo_count": 534,
+  "video_only_demo_count": 834,
   "video_path_template": "videos/chunk-000/observation.images.{view}/episode_{episode_id:06d}.mp4",
   "tasks": [
     {
@@ -85,6 +85,14 @@
       "description": "Pick an object from the counter and place it into a microwave.",
       "split": "related_task",
       "video_episode_range": [0, 109]
+    },
+    {
+      "alias": "TurnOnSinkFaucet",
+      "task_id": 105,
+      "dataset_path": "third_party/robocasa/datasets/v1.0/pretrain/atomic/TurnOnSinkFaucet/20250819/lerobot",
+      "description": "Turn on a sink faucet.",
+      "split": "related_task",
+      "video_episode_range": [0, 106]
     }
   ],
   "notes": [

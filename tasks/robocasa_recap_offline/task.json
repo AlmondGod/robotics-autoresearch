@@ -6,25 +6,39 @@
   "train": "tasks/robocasa_recap_offline/train.py",
   "inference": "tasks/robocasa_recap_offline/inference.py",
   "eval": "tasks/robocasa_recap_offline/eval.py",
-  "manifest": "data/robocasa5/manifest.json",
-  "split": "data/autorobobench/robocasa_bc5_splits.json",
+  "manifest": "data/autorobobench/robocasa_stand_mixer_peak_manifest.json",
+  "split": "data/autorobobench/robocasa_stand_mixer_peak_splits.json",
   "starter_metric": 0.1,
   "reference_metric": 0.7,
   "train_contract": {
     "single_model": true,
-    "train_tasks": 5,
-    "eval_tasks": 5,
+    "train_tasks": 1,
+    "eval_tasks": 1,
+    "target_task": "PickPlaceCounterToStandMixer",
+    "base_policy": "robocasa_stand_mixer_peak temporal chunk BC",
     "test_time_demo_access": false,
     "offline_experience": true,
-    "experience_sources": ["demonstrations", "failed_rollouts", "corrections"]
+    "experience_sources": [
+      "demonstrations",
+      "failed_rollouts",
+      "corrections"
+    ]
   },
   "policy_interface": {
     "load_policy": "load_policy(checkpoint: str, device: str) -> policy",
-    "act": "act(policy, obs: dict, task: dict) -> np.ndarray[action_horizon, action_dim]"
+    "act": "act(policy, obs: dict, task: dict) -> np.ndarray[action_horizon, action_dim]",
+    "commit_steps": "optional commit_steps(policy, task: dict, action_chunk: np.ndarray, default_commit_steps: int) -> int"
   },
   "default_eval": {
     "eval_episodes_per_task": 10,
-    "max_steps": 260,
-    "commit_steps": 16
+    "max_steps": 750,
+    "commit_steps": 8
+  },
+  "metrics": {
+    "primary": "recap_final_success",
+    "secondary": [
+      "success_rate"
+    ],
+    "higher_is_better": true
   }
 }

@@ -24,6 +24,7 @@ from train.train_autorobobench_robocasa_bc5 import (
     _augment,
     _batch,
     _chunk_weights,
+    _load_init_checkpoint,
     _mean_std,
     _task_texts_for_split,
     _weighted_masked_mean_std,
@@ -32,6 +33,17 @@ from train.train_autorobobench_robocasa_bc5 import (
 
 
 ensure_robocasa_runtime()
+
+
+FROZEN_MANIFEST = "data/autorobobench/robocasa_stand_mixer_peak_manifest.json"
+FROZEN_SPLIT = "data/autorobobench/robocasa_stand_mixer_peak_splits.json"
+DEFAULT_INIT_CHECKPOINT = "auto"
+INIT_CHECKPOINT_CANDIDATES = (
+    "runs/autorobobench/robocasa_stand_mixer_peak/a100_5min_seed0/policy_best.pt",
+    "runs/autorobobench/robocasa_stand_mixer_peak/a100_5min_full_seed0/policy_best.pt",
+    "runs/autorobobench/robocasa_stand_mixer_peak/"
+    "temporal_bc_mwinit_1600_seed0/policy_best.pt",
+)
 
 
 @dataclass
@@ -44,25 +56,27 @@ class RecapData:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train a RECAP-style offline RoboCasa policy.")
-    parser.add_argument("--manifest", default="data/robocasa5/manifest.json")
-    parser.add_argument("--split", default="data/autorobobench/robocasa_bc5_splits.json")
-    parser.add_argument("--out-dir", default="runs/autorobobench/robocasa_recap_offline/baseline")
-    parser.add_argument("--train-episodes-per-task", type=int, default=4)
-    parser.add_argument("--val-episodes-per-task", type=int, default=2)
+    parser.add_argument("--manifest", default=FROZEN_MANIFEST)
+    parser.add_argument("--split", default=FROZEN_SPLIT)
+    parser.add_argument("--out-dir", default="runs/autorobobench/robocasa_recap_offline/stand_mixer")
+    parser.add_argument("--train-episodes-per-task", type=int, default=80)
+    parser.add_argument("--val-episodes-per-task", type=int, default=10)
     parser.add_argument("--task-alias", action="append", default=[])
     parser.add_argument("--chunk-horizon", type=int, default=16)
-    parser.add_argument("--frame-stride", type=int, default=2)
-    parser.add_argument("--steps", type=int, default=200)
+    parser.add_argument("--frame-stride", type=int, default=1)
+    parser.add_argument("--eval-commit-steps", type=int, default=8)
+    parser.add_argument("--steps", type=int, default=800)
     parser.add_argument("--max-train-seconds", type=float, default=0.0)
-    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--width", type=int, default=256)
-    parser.add_argument("--dropout", type=float, default=0.05)
+    parser.add_argument("--dropout", type=float, default=0.03)
     parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
-    parser.add_argument("--image-noise", type=float, default=0.01)
-    parser.add_argument("--proprio-noise", type=float, default=0.01)
-    parser.add_argument("--action-smooth", type=float, default=0.001)
-    parser.add_argument("--chunk-decay", type=float, default=1.0)
+    parser.add_argument("--image-noise", type=float, default=0.004)
+    parser.add_argument("--proprio-noise", type=float, default=0.004)
+    parser.add_argument("--action-smooth", type=float, default=0.0005)
+    parser.add_argument("--chunk-decay", type=float, default=0.82)
+    parser.add_argument("--init-checkpoint", default=DEFAULT_INIT_CHECKPOINT)
     parser.add_argument("--experience-multiplier", type=float, default=1.0)
     parser.add_argument("--bad-action-noise", type=float, default=0.35)
     parser.add_argument("--bad-sample-weight", type=float, default=0.35)
@@ -123,6 +137,9 @@ def main() -> None:
         width=int(args.width),
         dropout=float(args.dropout),
     ).to(device)
+    init_info = _load_recap_init_checkpoint(model, str(args.init_checkpoint), device)
+    if init_info["path"]:
+        print(json.dumps({"init_checkpoint": init_info}, sort_keys=True), flush=True)
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(args.lr), weight_decay=float(args.weight_decay))
 
     best_val_loss = math.inf
@@ -189,6 +206,7 @@ def main() -> None:
         "task_count": task_count,
         "width": int(args.width),
         "dropout": float(args.dropout),
+        "eval_commit_steps": int(args.eval_commit_steps),
         "policy_kind": "advantage_conditioned_bc",
         "task_texts": task_texts,
         "views": ["robot0_agentview_left", "robot0_agentview_right"],
@@ -203,6 +221,9 @@ def main() -> None:
         "recap_bad_action_noise": float(args.bad_action_noise),
         "recap_bad_sample_weight": float(args.bad_sample_weight),
         "recap_correction_fraction": float(args.correction_fraction),
+        "init_checkpoint": str(args.init_checkpoint),
+        "resolved_init_checkpoint": str(init_info.get("path", "")),
+        "init_info": init_info,
     }
     torch.save(checkpoint, out_dir / "policy.pt")
     best_checkpoint = dict(checkpoint)
@@ -224,6 +245,7 @@ def main() -> None:
         "split_summary": split_summary,
         "chunk_horizon": int(args.chunk_horizon),
         "frame_stride": int(args.frame_stride),
+        "eval_commit_steps": int(args.eval_commit_steps),
         "train_episodes_per_task": int(args.train_episodes_per_task),
         "val_episodes_per_task": int(args.val_episodes_per_task),
         "steps_completed": int(history[-1]["step"] if history else 0),
@@ -241,6 +263,9 @@ def main() -> None:
         "correction_fraction": float(args.correction_fraction),
         "correction_weight": float(args.correction_weight),
         "eval_advantage": float(args.eval_advantage),
+        "init_checkpoint": str(args.init_checkpoint),
+        "resolved_init_checkpoint": str(init_info.get("path", "")),
+        "init_info": init_info,
         "history": history,
     }
     metrics_path = out_dir / "metrics.json"
@@ -296,6 +321,28 @@ def _build_recap_data(
         advantage=np.concatenate(advantages, axis=0).astype(np.float32),
         source_id=np.concatenate(sources, axis=0).astype(np.int64),
     )
+
+
+def _load_recap_init_checkpoint(model: torch.nn.Module, checkpoint: str, device: torch.device) -> dict:
+    if not checkpoint:
+        return {"loaded": 0, "skipped": 0, "path": ""}
+    if checkpoint == "auto":
+        for candidate in INIT_CHECKPOINT_CANDIDATES:
+            if Path(candidate).exists():
+                checkpoint = candidate
+                break
+        else:
+            raise FileNotFoundError(
+                "could not resolve --init-checkpoint auto; tried "
+                + ", ".join(INIT_CHECKPOINT_CANDIDATES)
+                + "; pass --init-checkpoint '' to train from scratch"
+            )
+    checkpoint_path = Path(checkpoint)
+    if not checkpoint_path.exists():
+        raise FileNotFoundError(
+            f"missing --init-checkpoint {checkpoint_path}; pass --init-checkpoint '' to train from scratch"
+        )
+    return _load_init_checkpoint(model, str(checkpoint_path), device)
 
 
 def _with_advantage(*, train_like: TemporalChunkData, advantage: np.ndarray) -> TemporalChunkData:

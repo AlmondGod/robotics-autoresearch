@@ -412,7 +412,7 @@ def act(policy: Policy, obs: dict, task: dict) -> np.ndarray:
                 proprio_t,
                 task_t,
                 steps=int(policy.checkpoint.get("flow_steps", 8)),
-                start=str(policy.checkpoint.get("flow_eval_start", "bc")),
+                start=_flow_inference_start(policy.checkpoint),
             )[0]
         else:
             pred_norm = policy.model(agent_t, wrist_t, proprio_t, task_t)[0]
@@ -420,6 +420,35 @@ def act(policy: Policy, obs: dict, task: dict) -> np.ndarray:
     out = _slice_return_horizon(policy, pred.detach().cpu().numpy().astype(np.float32), task_id)
     policy.history_step_idx = int(policy.history_step_idx) + int(out.shape[0])
     return out
+
+
+def commit_steps(
+    policy: Policy,
+    *,
+    task: dict | None = None,
+    action_chunk: np.ndarray | None = None,
+    default_commit_steps: int = 16,
+) -> int:
+    checkpoint = policy.checkpoint
+    task_id = int(task["task_id"]) if task is not None and "task_id" in task else None
+    by_task = checkpoint.get("eval_commit_steps_by_task")
+    if by_task is not None and task_id is not None:
+        try:
+            return int(by_task[task_id])
+        except (IndexError, KeyError, TypeError):
+            pass
+    if checkpoint.get("eval_commit_steps") is not None:
+        return int(checkpoint["eval_commit_steps"])
+    if checkpoint.get("return_horizon_by_task") is not None and task_id is not None:
+        try:
+            return int(checkpoint["return_horizon_by_task"][task_id])
+        except (IndexError, KeyError, TypeError):
+            pass
+    if checkpoint.get("return_horizon") is not None:
+        return int(checkpoint["return_horizon"])
+    if action_chunk is not None:
+        return int(min(default_commit_steps, action_chunk.shape[0]))
+    return int(default_commit_steps)
 
 
 def _act_history(policy: Policy, obs: dict, task_id: int) -> np.ndarray:
@@ -467,7 +496,7 @@ def _act_history(policy: Policy, obs: dict, task_id: int) -> np.ndarray:
                 proprio_t,
                 task_t,
                 steps=int(policy.checkpoint.get("flow_steps", 8)),
-                start=str(policy.checkpoint.get("flow_eval_start", "bc")),
+                start=_flow_inference_start(policy.checkpoint),
                 residual_scale=float(policy.checkpoint.get("flow_residual_scale", 1.0)),
             )[0]
         else:
@@ -490,6 +519,15 @@ def _act_history(policy: Policy, obs: dict, task_id: int) -> np.ndarray:
     out = _slice_return_horizon(policy, pred.detach().cpu().numpy().astype(np.float32), task_id)
     policy.history_step_idx = int(policy.history_step_idx) + int(out.shape[0])
     return out
+
+
+def _flow_inference_start(checkpoint: dict) -> str:
+    explicit = checkpoint.get("flow_inference_start")
+    if explicit is not None:
+        return str(explicit)
+    if str(checkpoint.get("flow_source", "")) == "noise":
+        return "noise"
+    return str(checkpoint.get("flow_eval_start", "bc"))
 
 
 def _maybe_append_progress(checkpoint: dict, proprio: np.ndarray, frame_idx: int) -> np.ndarray:

@@ -13,14 +13,14 @@
   "benchmark": {
     "phase": 1,
     "primary_metric": "hidden_final_success",
-    "starter_metric": 0.10,
-    "reference_metric": 0.70,
+    "starter_metric": 0.1,
+    "reference_metric": 0.7,
     "higher_is_better": true,
     "score_weights": {
-      "hidden_final_success": 0.60,
-      "improvement_auc_over_budget": 0.20,
-      "robustness_generalization": 0.10,
-      "reproducibility_integrity": 0.10
+      "hidden_final_success": 0.6,
+      "improvement_auc_over_budget": 0.2,
+      "robustness_generalization": 0.1,
+      "reproducibility_integrity": 0.1
     },
     "required_result_keys": [
       "hidden_final_success",
@@ -54,7 +54,8 @@
   },
   "policy_interface": {
     "load_policy": "load_policy(checkpoint: str, device: str) -> policy",
-    "act": "act(policy, obs: dict, task: dict) -> np.ndarray[action_horizon, action_dim]"
+    "act": "act(policy, obs: dict, task: dict) -> np.ndarray[action_horizon, action_dim]",
+    "commit_steps": "optional commit_steps(policy, task: dict, action_chunk: np.ndarray, default_commit_steps: int) -> int"
   },
   "default_eval": {
     "eval_episodes_per_task": 10,

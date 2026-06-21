@@ -202,7 +202,14 @@ def _rollout_episode(
             action_chunk = np.asarray(inference.act(policy, obs, task), dtype=np.float32)
             if action_chunk.ndim != 2:
                 raise ValueError(f"inference.act must return [horizon, action_dim], got shape {action_chunk.shape}")
-            actions = action_chunk[: min(int(commit_steps), action_chunk.shape[0], max_steps - step_idx)]
+            resolved_commit_steps = _resolve_commit_steps(
+                policy=policy,
+                inference=inference,
+                task=task,
+                action_chunk=action_chunk,
+                default_commit_steps=int(commit_steps),
+            )
+            actions = action_chunk[: min(resolved_commit_steps, action_chunk.shape[0], max_steps - step_idx)]
             actions = np.clip(actions, -1.0, 1.0).astype(np.float32)
             for action in actions:
                 _, _, _, info = env.step(action)
@@ -229,6 +236,52 @@ def _rollout_episode(
         except Exception:
             pass
     return frames, success, step_idx, actions_applied, success_trace
+
+
+def _resolve_commit_steps(
+    *,
+    policy,
+    inference,
+    task: dict,
+    action_chunk: np.ndarray,
+    default_commit_steps: int,
+) -> int:
+    value = None
+    if hasattr(inference, "commit_steps"):
+        fn = getattr(inference, "commit_steps")
+        for kwargs in (
+            {
+                "task": task,
+                "action_chunk": action_chunk,
+                "default_commit_steps": int(default_commit_steps),
+            },
+            {"task": task, "default_commit_steps": int(default_commit_steps)},
+            {"default_commit_steps": int(default_commit_steps)},
+            {},
+        ):
+            try:
+                value = fn(policy, **kwargs)
+                break
+            except TypeError:
+                continue
+    if value is None:
+        checkpoint = getattr(policy, "checkpoint", None)
+        if isinstance(checkpoint, dict):
+            by_task = checkpoint.get("eval_commit_steps_by_task")
+            if by_task is not None:
+                task_id = int(task["task_id"])
+                try:
+                    value = int(by_task[task_id])
+                except (IndexError, KeyError, TypeError):
+                    value = None
+            if value is None and checkpoint.get("eval_commit_steps") is not None:
+                value = checkpoint.get("eval_commit_steps")
+    if value is None:
+        value = default_commit_steps
+    value = int(value)
+    if value <= 0:
+        raise ValueError(f"commit_steps must be positive, got {value}")
+    return value
 
 
 def _render64(env, camera_name: str) -> np.ndarray:

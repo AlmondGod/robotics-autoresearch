@@ -275,7 +275,7 @@ def main() -> None:
     parser.add_argument("--flow-steps", type=int, default=8)
     parser.add_argument("--flow-sigma", type=float, default=1.0)
     parser.add_argument("--flow-source", choices=["noise", "bc"], default="noise")
-    parser.add_argument("--flow-eval-start", choices=["zero", "noise", "bc"], default="bc")
+    parser.add_argument("--flow-eval-start", choices=["zero", "noise", "bc"], default="noise")
     parser.add_argument("--flow-residual-scale", type=float, default=1.0)
     parser.add_argument("--flow-time-sampling", choices=["uniform", "beta_low_noise"], default="uniform")
     parser.add_argument("--bc-aux-weight", type=float, default=0.1)
@@ -835,6 +835,7 @@ def main() -> None:
         "flow_sigma": float(args.flow_sigma),
         "flow_source": str(args.flow_source),
         "flow_eval_start": str(args.flow_eval_start),
+        "flow_inference_start": str(args.flow_eval_start),
         "flow_residual_scale": float(args.flow_residual_scale),
         "flow_time_sampling": str(args.flow_time_sampling),
         "bc_aux_weight": float(args.bc_aux_weight),
@@ -905,6 +906,7 @@ def main() -> None:
         "flow_sigma": float(args.flow_sigma),
         "flow_source": str(args.flow_source),
         "flow_eval_start": str(args.flow_eval_start),
+        "flow_inference_start": str(args.flow_eval_start),
         "flow_residual_scale": float(args.flow_residual_scale),
         "flow_time_sampling": str(args.flow_time_sampling),
         "bc_aux_weight": float(args.bc_aux_weight),

@@ -8,6 +8,8 @@ from pathlib import Path
 
 import numpy as np
 import torch
+import torch.nn.functional as F
+from torch import nn
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) in sys.path:
@@ -19,6 +21,8 @@ from tasks.robocasa_world_model.data import (
     DEFAULT_SPLIT,
     DEFAULT_VIDEO_POOL,
     TransitionData,
+    load_video_frame,
+    load_video_frames,
     load_transition_data,
     load_video_only_pool,
     make_stats,
@@ -26,7 +30,9 @@ from tasks.robocasa_world_model.data import (
     save_json,
     summarize_video_only_pool,
 )
+from tasks.robocasa_world_model.inverse_dynamics import load_inverse_dynamics
 from tasks.robocasa_world_model.model import RoboCasaWorldModel
+from tasks.robocasa_world_model.video_repr import load_video_encoder
 from train.common import device_from_arg
 
 
@@ -37,6 +43,14 @@ def main() -> None:
     parser.add_argument("--video-pool", default=str(DEFAULT_VIDEO_POOL))
     parser.add_argument("--video-episodes-per-task", type=int, default=0)
     parser.add_argument("--video-pool-split", action="append", default=[])
+    parser.add_argument("--video-repr-checkpoint", default="")
+    parser.add_argument("--video-align-weight", type=float, default=0.0)
+    parser.add_argument("--video-align-view", default="robot0_agentview_right")
+    parser.add_argument("--video-align-image-size", type=int, default=96)
+    parser.add_argument("--inverse-dynamics-checkpoint", default="")
+    parser.add_argument("--inverse-align-weight", type=float, default=0.0)
+    parser.add_argument("--inverse-align-view", default="robot0_agentview_right")
+    parser.add_argument("--inverse-align-image-size", type=int, default=64)
     parser.add_argument("--out-dir", default="runs/autorobobench/robocasa_world_model/base")
     parser.add_argument("--train-episodes-per-task", type=int, default=20)
     parser.add_argument("--val-episodes-per-task", type=int, default=5)
@@ -107,7 +121,18 @@ def main() -> None:
         latent_dim=int(args.latent_dim),
         dropout=float(args.dropout),
     ).to(device)
-    opt = torch.optim.AdamW(model.parameters(), lr=float(args.lr), weight_decay=float(args.weight_decay))
+    params = list(model.parameters())
+    video_align, video_align_head = _build_video_alignment(args, device)
+    inverse_align, inverse_align_head = _build_inverse_alignment(args, device, width=int(args.width))
+    if video_align_head is not None:
+        params.extend(video_align_head.parameters())
+    if inverse_align_head is not None:
+        params.extend(inverse_align_head.parameters())
+    opt = torch.optim.AdamW(params, lr=float(args.lr), weight_decay=float(args.weight_decay))
+    if video_align is not None and float(video_align["weight"]) > 0:
+        video_align["train_targets"] = _precompute_video_targets(train, summary, video_align, device)
+    if inverse_align is not None and float(inverse_align["weight"]) > 0:
+        inverse_align["train_targets"] = _precompute_inverse_targets(train, summary, inverse_align, device)
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -128,9 +153,17 @@ def main() -> None:
             success_weight=float(args.success_weight),
             kl_weight=float(args.kl_weight),
         )
+        if video_align is not None and float(video_align["weight"]) > 0:
+            align_loss = _video_alignment_loss(model, batch, train, idx, summary, video_align, device)
+            loss = loss + float(video_align["weight"]) * align_loss
+            metrics["video_align_loss"] = align_loss.detach()
+        if inverse_align is not None and float(inverse_align["weight"]) > 0:
+            inverse_loss = _inverse_alignment_loss(model, batch, idx, inverse_align, device)
+            loss = loss + float(inverse_align["weight"]) * inverse_loss
+            metrics["inverse_align_loss"] = inverse_loss.detach()
         opt.zero_grad()
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        torch.nn.utils.clip_grad_norm_(params, 1.0)
         opt.step()
         if step == 1 or step % max(1, int(args.steps) // 20) == 0:
             val_metrics = _eval(model, val, int(args.batch_size), device)
@@ -144,10 +177,32 @@ def main() -> None:
             print(json.dumps(row, sort_keys=True), flush=True)
             if row["val_score_loss"] < best_val:
                 best_val = row["val_score_loss"]
-                _save_checkpoint(out_dir / "policy_best.pt", model, stats, args, summary, video_summary, history, step)
+                _save_checkpoint(
+                    out_dir / "policy_best.pt",
+                    model,
+                    stats,
+                    args,
+                    summary,
+                    video_summary,
+                    video_align,
+                    inverse_align,
+                    history,
+                    step,
+                )
 
     final_metrics = _eval(model, val, int(args.batch_size), device)
-    _save_checkpoint(out_dir / "policy_last.pt", model, stats, args, summary, video_summary, history, len(history))
+    _save_checkpoint(
+        out_dir / "policy_last.pt",
+        model,
+        stats,
+        args,
+        summary,
+        video_summary,
+        video_align,
+        inverse_align,
+        history,
+        len(history),
+    )
     payload = {
         "task": "robocasa_world_model",
         "checkpoint": str(out_dir / "policy_best.pt"),
@@ -155,6 +210,8 @@ def main() -> None:
         "train_transitions": len(train),
         "val_transitions": len(val),
         "video_only_pool": video_summary,
+        "video_alignment": _video_alignment_summary(args, video_align),
+        "inverse_alignment": _inverse_alignment_summary(args, inverse_align),
         "summary": summary,
         "final_val": final_metrics,
         "best_val_score_loss": best_val,
@@ -175,6 +232,214 @@ def _batch(data: TransitionData, idx: np.ndarray, device: torch.device) -> dict[
         "reward": torch.as_tensor(data.reward[idx], dtype=torch.float32, device=device),
         "success": torch.as_tensor(data.success[idx], dtype=torch.float32, device=device),
         "task_id": torch.as_tensor(data.task_id[idx], dtype=torch.long, device=device),
+    }
+
+
+def _build_video_alignment(args: argparse.Namespace, device: torch.device) -> tuple[dict | None, nn.Module | None]:
+    if not args.video_repr_checkpoint and float(args.video_align_weight) <= 0:
+        return None, None
+    if not args.video_repr_checkpoint:
+        raise ValueError("--video-align-weight requires --video-repr-checkpoint")
+    if int(args.latent_dim) <= 0:
+        raise ValueError("video representation alignment requires --latent-dim > 0")
+    encoder = load_video_encoder(args.video_repr_checkpoint, device)
+    for param in encoder.parameters():
+        param.requires_grad_(False)
+    head = nn.Linear(int(args.latent_dim), int(encoder.embed_dim)).to(device)
+    return (
+        {
+            "encoder": encoder,
+            "head": head,
+            "weight": float(args.video_align_weight),
+            "view": str(args.video_align_view),
+            "image_size": int(args.video_align_image_size),
+        },
+        head,
+    )
+
+
+def _build_inverse_alignment(
+    args: argparse.Namespace,
+    device: torch.device,
+    *,
+    width: int,
+) -> tuple[dict | None, nn.Module | None]:
+    if not args.inverse_dynamics_checkpoint and float(args.inverse_align_weight) <= 0:
+        return None, None
+    if not args.inverse_dynamics_checkpoint:
+        raise ValueError("--inverse-align-weight requires --inverse-dynamics-checkpoint")
+    inverse = load_inverse_dynamics(args.inverse_dynamics_checkpoint, device)
+    inverse_model = inverse["model"]
+    for param in inverse_model.parameters():
+        param.requires_grad_(False)
+    feature_dim = 192
+    head = nn.Linear(int(width), feature_dim).to(device)
+    return (
+        {
+            "model": inverse_model,
+            "head": head,
+            "feature_dim": feature_dim,
+            "weight": float(args.inverse_align_weight),
+            "view": str(args.inverse_align_view),
+            "image_size": int(args.inverse_align_image_size),
+            "checkpoint": str(args.inverse_dynamics_checkpoint),
+        },
+        head,
+    )
+
+
+def _video_alignment_loss(
+    model: RoboCasaWorldModel,
+    batch: dict[str, torch.Tensor],
+    data: TransitionData,
+    idx: np.ndarray,
+    summary: list[dict],
+    video_align: dict,
+    device: torch.device,
+) -> torch.Tensor:
+    if "train_targets" in video_align:
+        target = video_align["train_targets"][torch.as_tensor(idx, dtype=torch.long, device=device)]
+    else:
+        frames = []
+        dataset_by_task = {int(row["task_id"]): Path(row["dataset_path"]) for row in summary}
+        view = str(video_align["view"])
+        image_size = int(video_align["image_size"])
+        for task_id, episode_id, frame_idx in zip(data.task_id[idx], data.episode_id[idx], data.frame_idx[idx]):
+            root = dataset_by_task[int(task_id)]
+            video = root / "videos" / "chunk-000" / f"observation.images.{view}" / f"episode_{int(episode_id):06d}.mp4"
+            frames.append(_preprocess_frame(load_video_frame(video, int(frame_idx)), image_size))
+        image = torch.as_tensor(np.stack(frames), dtype=torch.float32, device=device)
+        with torch.no_grad():
+            target = video_align["encoder"](image)["embedding"]
+    z, _, _ = model.encode_state(batch["state"], sample=False)
+    pred = F.normalize(video_align["head"](z), dim=-1)
+    return F.mse_loss(pred, target)
+
+
+def _inverse_alignment_loss(
+    model: RoboCasaWorldModel,
+    batch: dict[str, torch.Tensor],
+    idx: np.ndarray,
+    inverse_align: dict,
+    device: torch.device,
+) -> torch.Tensor:
+    target = inverse_align["train_targets"][torch.as_tensor(idx, dtype=torch.long, device=device)]
+    hidden = _transition_hidden(model, batch)
+    pred = F.normalize(inverse_align["head"](hidden), dim=-1)
+    return F.mse_loss(pred, target)
+
+
+def _transition_hidden(model: RoboCasaWorldModel, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+    z, _, _ = model.encode_state(batch["state"], sample=False)
+    progress = batch["progress"]
+    if progress.ndim == 1:
+        progress = progress[:, None]
+    h = torch.cat([z, batch["action"], model.task(batch["task_id"].long()), progress.float()], dim=-1)
+    return model.trunk(h)
+
+
+@torch.no_grad()
+def _precompute_video_targets(
+    data: TransitionData,
+    summary: list[dict],
+    video_align: dict,
+    device: torch.device,
+) -> torch.Tensor:
+    encoder = video_align["encoder"]
+    encoder.eval()
+    targets = torch.empty((len(data), int(encoder.embed_dim)), dtype=torch.float32, device=device)
+    dataset_by_task = {int(row["task_id"]): Path(row["dataset_path"]) for row in summary}
+    view = str(video_align["view"])
+    image_size = int(video_align["image_size"])
+    groups: dict[tuple[int, int], list[int]] = {}
+    for index, (task_id, episode_id) in enumerate(zip(data.task_id, data.episode_id)):
+        groups.setdefault((int(task_id), int(episode_id)), []).append(index)
+    for (task_id, episode_id), indices in sorted(groups.items()):
+        root = dataset_by_task[int(task_id)]
+        video = root / "videos" / "chunk-000" / f"observation.images.{view}" / f"episode_{int(episode_id):06d}.mp4"
+        frames = load_video_frames(video)
+        frame_indices = np.clip(data.frame_idx[np.asarray(indices, dtype=np.int64)], 0, max(0, len(frames) - 1))
+        for start in range(0, len(indices), 256):
+            batch_indices = indices[start : start + 256]
+            batch_frames = [_preprocess_frame(frames[int(frame_idx)], image_size) for frame_idx in frame_indices[start : start + 256]]
+            image = torch.as_tensor(np.stack(batch_frames), dtype=torch.float32, device=device)
+            targets[torch.as_tensor(batch_indices, dtype=torch.long, device=device)] = encoder(image)["embedding"]
+    return targets
+
+
+@torch.no_grad()
+def _precompute_inverse_targets(
+    data: TransitionData,
+    summary: list[dict],
+    inverse_align: dict,
+    device: torch.device,
+) -> torch.Tensor:
+    inverse_model = inverse_align["model"]
+    inverse_model.eval()
+    feature_dim = int(inverse_align["feature_dim"])
+    targets = torch.empty((len(data), feature_dim), dtype=torch.float32, device=device)
+    dataset_by_task = {int(row["task_id"]): Path(row["dataset_path"]) for row in summary}
+    view = str(inverse_align["view"])
+    image_size = int(inverse_align["image_size"])
+    groups: dict[tuple[int, int], list[int]] = {}
+    for index, (task_id, episode_id) in enumerate(zip(data.task_id, data.episode_id)):
+        groups.setdefault((int(task_id), int(episode_id)), []).append(index)
+    for (task_id, episode_id), indices in sorted(groups.items()):
+        root = dataset_by_task[int(task_id)]
+        video = root / "videos" / "chunk-000" / f"observation.images.{view}" / f"episode_{int(episode_id):06d}.mp4"
+        frames = load_video_frames(video)
+        frame_indices = np.clip(data.frame_idx[np.asarray(indices, dtype=np.int64)], 0, max(0, len(frames) - 2))
+        for start in range(0, len(indices), 256):
+            batch_indices = indices[start : start + 256]
+            pairs = []
+            for frame_idx in frame_indices[start : start + 256]:
+                frame_i = int(frame_idx)
+                pairs.append(
+                    np.concatenate(
+                        [
+                            _preprocess_frame(frames[frame_i], image_size),
+                            _preprocess_frame(frames[min(frame_i + 1, len(frames) - 1)], image_size),
+                        ],
+                        axis=0,
+                    )
+                )
+            image_pair = torch.as_tensor(np.stack(pairs), dtype=torch.float32, device=device)
+            encoded = F.normalize(inverse_model.encode_pair(image_pair), dim=-1)
+            targets[torch.as_tensor(batch_indices, dtype=torch.long, device=device)] = encoded
+    return targets
+
+
+def _preprocess_frame(frame: np.ndarray, image_size: int) -> np.ndarray:
+    try:
+        import cv2  # type: ignore
+
+        resized = cv2.resize(frame, (int(image_size), int(image_size)), interpolation=cv2.INTER_AREA)
+    except ModuleNotFoundError:
+        from PIL import Image
+
+        resized = np.asarray(Image.fromarray(frame).resize((int(image_size), int(image_size))))
+    return np.transpose(resized.astype(np.float32) / 255.0, (2, 0, 1))
+
+
+def _video_alignment_summary(args: argparse.Namespace, video_align: dict | None) -> dict:
+    return {
+        "enabled": video_align is not None and float(args.video_align_weight) > 0,
+        "checkpoint": str(args.video_repr_checkpoint),
+        "weight": float(args.video_align_weight),
+        "view": str(args.video_align_view),
+        "image_size": int(args.video_align_image_size),
+        "requires_latent_dim": True,
+    }
+
+
+def _inverse_alignment_summary(args: argparse.Namespace, inverse_align: dict | None) -> dict:
+    return {
+        "enabled": inverse_align is not None and float(args.inverse_align_weight) > 0,
+        "checkpoint": str(args.inverse_dynamics_checkpoint),
+        "weight": float(args.inverse_align_weight),
+        "view": str(args.inverse_align_view),
+        "image_size": int(args.inverse_align_image_size),
+        "target": "frozen_inverse_dynamics_pair_encoder",
     }
 
 
@@ -208,6 +473,8 @@ def _save_checkpoint(
     args: argparse.Namespace,
     summary: list[dict],
     video_summary: dict,
+    video_align: dict | None,
+    inverse_align: dict | None,
     history: list[dict],
     step: int,
 ) -> None:
@@ -229,6 +496,8 @@ def _save_checkpoint(
             "stats": stats,
             "summary": summary,
             "video_only_pool": video_summary,
+            "video_alignment": _video_alignment_summary(args, video_align),
+            "inverse_alignment": _inverse_alignment_summary(args, inverse_align),
             "history": history,
             "step": int(step),
             "task": "robocasa_world_model",

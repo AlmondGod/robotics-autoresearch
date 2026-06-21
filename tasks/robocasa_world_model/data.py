@@ -184,6 +184,27 @@ def load_video_frames(video_path: str | Path, *, stride: int = 1, max_frames: in
         return np.asarray(frames, dtype=np.uint8)
 
 
+def load_video_frame(video_path: str | Path, frame_idx: int) -> np.ndarray:
+    path = Path(video_path)
+    try:
+        import cv2  # type: ignore
+
+        cap = cv2.VideoCapture(str(path))
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_idx))
+        ok, frame = cap.read()
+        cap.release()
+        if not ok:
+            raise IndexError(f"could not read frame {frame_idx} from {path}")
+        return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB).astype(np.uint8)
+    except ModuleNotFoundError:
+        import imageio.v3 as iio
+
+        for index, frame in enumerate(iio.imiter(path)):
+            if index == int(frame_idx):
+                return np.asarray(frame, dtype=np.uint8)
+        raise IndexError(f"could not read frame {frame_idx} from {path}")
+
+
 def _append_episodes(parts: list[dict[str, np.ndarray]], dataset_root: Path, episode_ids: list[int], task_id: int, frame_stride: int) -> int:
     count = 0
     for episode_id in episode_ids:

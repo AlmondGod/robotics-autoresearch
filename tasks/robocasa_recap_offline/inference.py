@@ -73,3 +73,25 @@ def act(policy: Policy, obs: dict, task: dict) -> np.ndarray:
         pred_norm = policy.model(agent_t, wrist_t, proprio_t, task_t)[0]
         pred = pred_norm * policy.action_std + policy.action_mean
     return pred.detach().cpu().numpy().astype(np.float32)
+
+
+def commit_steps(
+    policy: Policy,
+    *,
+    task: dict | None = None,
+    action_chunk: np.ndarray | None = None,
+    default_commit_steps: int = 8,
+) -> int:
+    checkpoint = policy.checkpoint
+    task_id = int(task["task_id"]) if task is not None and "task_id" in task else None
+    by_task = checkpoint.get("eval_commit_steps_by_task")
+    if by_task is not None and task_id is not None:
+        try:
+            return int(by_task[task_id])
+        except (IndexError, KeyError, TypeError):
+            pass
+    if checkpoint.get("eval_commit_steps") is not None:
+        return int(checkpoint["eval_commit_steps"])
+    if action_chunk is not None:
+        return int(min(default_commit_steps, action_chunk.shape[0]))
+    return int(default_commit_steps)

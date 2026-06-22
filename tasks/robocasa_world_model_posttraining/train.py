@@ -33,20 +33,18 @@ from train.train_autorobobench_robocasa_bc5 import (
 
 SUPPORTED_MODES = {"chunk", "sequence_flow"}
 SUPPORTED_KINDS = {"bc", "flow", "sequence_flow"}
-DEFAULT_MANIFEST = "data/autorobobench/robocasa_faucet_peak_manifest.json"
-DEFAULT_SPLIT = "data/autorobobench/robocasa_faucet_peak_splits.json"
-DEFAULT_POLICY_CHECKPOINT = (
-    "data/autorobobench/pretrained_policies/robocasa_faucet_direct_bc_all_data_5min_seed0.pt"
-)
+DEFAULT_MANIFEST = "data/autorobobench/robocasa_long_horizon_manifest.json"
+DEFAULT_SPLIT = "data/autorobobench/robocasa_long_horizon_splits.json"
+DEFAULT_POLICY_CHECKPOINT = "runs/autorobobench/robocasa_long_horizon/baseline/policy_best.pt"
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Improve a RoboCasa BC policy with a frozen world model.")
+    parser = argparse.ArgumentParser(description="Posttrain a RoboCasa policy with a frozen world model.")
     parser.add_argument("--manifest", default=DEFAULT_MANIFEST)
     parser.add_argument("--split", default=DEFAULT_SPLIT)
     parser.add_argument("--policy-checkpoint", default=DEFAULT_POLICY_CHECKPOINT)
     parser.add_argument("--world-model-checkpoint", required=True)
-    parser.add_argument("--out-dir", default="runs/autorobobench/robocasa_wm_policy_improvement/default")
+    parser.add_argument("--out-dir", default="runs/autorobobench/robocasa_world_model_posttraining/default")
     parser.add_argument("--train-episodes-per-task", type=int, default=4)
     parser.add_argument("--val-episodes-per-task", type=int, default=2)
     parser.add_argument("--task-alias", action="append", default=[])
@@ -59,7 +57,6 @@ def main() -> None:
     parser.add_argument("--weight-decay", type=float, default=1e-5)
     parser.add_argument("--wm-rollout-horizon", type=int, default=4)
     parser.add_argument("--wm-success-weight", type=float, default=1.0)
-    parser.add_argument("--wm-reward-weight", type=float, default=0.2)
     parser.add_argument("--wm-progress-weight", type=float, default=0.4)
     parser.add_argument("--bc-weight", type=float, default=0.5)
     parser.add_argument("--init-anchor-weight", type=float, default=0.25)
@@ -83,7 +80,7 @@ def main() -> None:
     policy_kind = str(policy.checkpoint.get("policy_kind", "bc"))
     if policy.mode not in SUPPORTED_MODES or policy_kind not in SUPPORTED_KINDS:
         raise ValueError(
-            "robocasa_wm_policy_improvement v0 supports only direct BC/flow/sequence_flow policies; "
+            "robocasa_world_model_posttraining v0 supports only direct BC/flow/sequence_flow policies; "
             f"got mode={policy.mode!r} policy_kind={policy_kind!r}"
         )
     model = policy.model
@@ -167,7 +164,6 @@ def main() -> None:
             progress,
             horizon=min(int(args.wm_rollout_horizon), pred_norm.shape[1]),
             success_weight=float(args.wm_success_weight),
-            reward_weight=float(args.wm_reward_weight),
             progress_weight=float(args.wm_progress_weight),
         )
         bc_loss = _masked_chunk_loss(pred_norm, batch["actions"], batch["mask"], chunk_decay=float(args.chunk_decay))
@@ -189,7 +185,6 @@ def main() -> None:
             "loss": float(loss.detach().cpu()),
             "wm_objective": float(wm_metrics["objective"].detach().cpu()),
             "wm_success": float(wm_metrics["success"].detach().cpu()),
-            "wm_reward": float(wm_metrics["reward"].detach().cpu()),
             "wm_progress_gain": float(wm_metrics["progress_gain"].detach().cpu()),
             "bc_loss": float(bc_loss.detach().cpu()),
             "init_anchor_mse": float(init_anchor.detach().cpu()),
@@ -212,7 +207,6 @@ def main() -> None:
                 wm_progress_scale=float(args.wm_progress_scale),
                 chunk_decay=float(args.chunk_decay),
                 success_weight=float(args.wm_success_weight),
-                reward_weight=float(args.wm_reward_weight),
                 progress_weight=float(args.wm_progress_weight),
             )
             row.update({f"val_{key}": value for key, value in val_metrics.items()})
@@ -248,7 +242,6 @@ def main() -> None:
         wm_progress_scale=float(args.wm_progress_scale),
         chunk_decay=float(args.chunk_decay),
         success_weight=float(args.wm_success_weight),
-        reward_weight=float(args.wm_reward_weight),
         progress_weight=float(args.wm_progress_weight),
     )
     if float(final_metrics["policy_improvement_score"]) > best_score:
@@ -278,7 +271,7 @@ def main() -> None:
     torch.save(best_checkpoint, out_dir / "policy_best.pt")
 
     metrics = {
-        "task": "robocasa_wm_policy_improvement",
+        "task": "robocasa_world_model_posttraining",
         "checkpoint": str(out_dir / "policy.pt"),
         "best_checkpoint": str(out_dir / "policy_best.pt"),
         "policy_checkpoint": str(args.policy_checkpoint),
@@ -303,7 +296,6 @@ def main() -> None:
         "objective": {
             "wm_rollout_horizon": int(args.wm_rollout_horizon),
             "wm_success_weight": float(args.wm_success_weight),
-            "wm_reward_weight": float(args.wm_reward_weight),
             "wm_progress_weight": float(args.wm_progress_weight),
             "bc_weight": float(args.bc_weight),
             "init_anchor_weight": float(args.init_anchor_weight),
@@ -429,7 +421,6 @@ def _wm_rollout_objective(
     *,
     horizon: int,
     success_weight: float,
-    reward_weight: float,
     progress_weight: float,
 ) -> dict[str, torch.Tensor]:
     stats = wm["stats"]
@@ -438,23 +429,19 @@ def _wm_rollout_objective(
     progress_t = progress.reshape(-1, 1).to(dtype=state.dtype, device=state.device)
     objective = torch.zeros((), dtype=state.dtype, device=state.device)
     success_terms = []
-    reward_terms = []
     progress_terms = []
     steps = max(1, min(int(horizon), int(actions_raw.shape[1])))
     for step in range(steps):
         action = (actions_raw[:, step] - stats["action_mean"]) / stats["action_std"].clamp_min(1e-6)
         out = model(state, action, task_id.long(), progress_t)
         success_prob = torch.sigmoid(out["success_logit"])
-        reward = out["reward"]
         next_progress = out["next_progress"].clamp(0.0, 1.0)
         progress_gain = next_progress - progress_t
         objective = objective + (
             float(success_weight) * success_prob.mean()
-            + float(reward_weight) * reward.mean()
             + float(progress_weight) * progress_gain.mean()
         )
         success_terms.append(success_prob.mean())
-        reward_terms.append(reward.mean())
         progress_terms.append(progress_gain.mean())
         state = out["next_state"]
         progress_t = next_progress
@@ -462,7 +449,6 @@ def _wm_rollout_objective(
     return {
         "objective": objective * scale,
         "success": torch.stack(success_terms).mean(),
-        "reward": torch.stack(reward_terms).mean(),
         "progress_gain": torch.stack(progress_terms).mean(),
     }
 
@@ -484,7 +470,6 @@ def _eval_improvement(
     wm_progress_scale: float,
     chunk_decay: float,
     success_weight: float,
-    reward_weight: float,
     progress_weight: float,
 ) -> dict[str, float]:
     was_training = model.training
@@ -492,7 +477,6 @@ def _eval_improvement(
     sums = {
         "wm_objective": 0.0,
         "wm_success": 0.0,
-        "wm_reward": 0.0,
         "wm_progress_gain": 0.0,
         "action_mse_normalized": 0.0,
         "init_anchor_mse": 0.0,
@@ -515,7 +499,6 @@ def _eval_improvement(
             progress,
             horizon=wm_rollout_horizon,
             success_weight=success_weight,
-            reward_weight=reward_weight,
             progress_weight=progress_weight,
         )
         action_mse = _masked_chunk_loss(pred_norm, batch["actions"], batch["mask"], chunk_decay=chunk_decay)
@@ -523,7 +506,6 @@ def _eval_improvement(
         n = len(idx)
         sums["wm_objective"] += float(wm_metrics["objective"].detach().cpu()) * n
         sums["wm_success"] += float(wm_metrics["success"].detach().cpu()) * n
-        sums["wm_reward"] += float(wm_metrics["reward"].detach().cpu()) * n
         sums["wm_progress_gain"] += float(wm_metrics["progress_gain"].detach().cpu()) * n
         sums["action_mse_normalized"] += float(action_mse.detach().cpu()) * n
         sums["init_anchor_mse"] += float(init_anchor.detach().cpu()) * n
@@ -568,15 +550,14 @@ def _policy_checkpoint_payload(
 ) -> dict:
     checkpoint = copy.deepcopy(source)
     checkpoint["state_dict"] = _checkpoint_state_dict(model, policy_kind)
-    checkpoint["task"] = "robocasa_wm_policy_improvement"
-    checkpoint["wm_policy_improvement"] = {
+    checkpoint["task"] = "robocasa_world_model_posttraining"
+    checkpoint["world_model_posttraining"] = {
         "source_policy_checkpoint": str(args.policy_checkpoint),
         "world_model_checkpoint": str(args.world_model_checkpoint),
         "best_step": int(best_step),
         "best_val_policy_improvement_score": float(best_score),
         "wm_rollout_horizon": int(args.wm_rollout_horizon),
         "wm_success_weight": float(args.wm_success_weight),
-        "wm_reward_weight": float(args.wm_reward_weight),
         "wm_progress_weight": float(args.wm_progress_weight),
         "bc_weight": float(args.bc_weight),
         "init_anchor_weight": float(args.init_anchor_weight),

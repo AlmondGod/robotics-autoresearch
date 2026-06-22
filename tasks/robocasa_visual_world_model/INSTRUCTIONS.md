@@ -7,7 +7,7 @@ Do not edit eval files or split files for scored runs.
 
 - Train a visual world model on BC5 transitions and videos.
 - Inputs: state, action, task, progress, current RGB.
-- Targets: next RGB, next state, next progress, reward, success.
+- Targets: next RGB, next state, next progress, success.
 - Metric: visual world-model score. LPIPS next-frame quality is the main term.
 - This is not a policy rollout score.
 

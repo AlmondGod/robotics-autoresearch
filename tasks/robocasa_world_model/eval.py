@@ -103,7 +103,6 @@ def _transition_eval(world: dict, data: TransitionData, batch_size: int) -> dict
     model.eval()
     state_sse = 0.0
     progress_sse = 0.0
-    reward_sse = 0.0
     success_loss = 0.0
     count = 0
     for start in range(0, len(data), batch_size):
@@ -114,7 +113,6 @@ def _transition_eval(world: dict, data: TransitionData, batch_size: int) -> dict
             "next_state": torch.as_tensor(data.next_state[start:end], dtype=torch.float32, device=device),
             "progress": torch.as_tensor(data.progress[start:end], dtype=torch.float32, device=device),
             "next_progress": torch.as_tensor(data.next_progress[start:end], dtype=torch.float32, device=device),
-            "reward": torch.as_tensor(data.reward[start:end], dtype=torch.float32, device=device),
             "success": torch.as_tensor(data.success[start:end], dtype=torch.float32, device=device),
             "task_id": torch.as_tensor(data.task_id[start:end], dtype=torch.long, device=device),
         }
@@ -122,14 +120,12 @@ def _transition_eval(world: dict, data: TransitionData, batch_size: int) -> dict
         n = end - start
         state_sse += float((out["next_state"] - batch["next_state"]).square().mean(dim=-1).sum().detach().cpu())
         progress_sse += float((out["next_progress"] - batch["next_progress"]).square().sum().detach().cpu())
-        reward_sse += float((out["reward"] - batch["reward"]).square().sum().detach().cpu())
         success_loss += float(torch.nn.functional.binary_cross_entropy_with_logits(out["success_logit"], batch["success"], reduction="sum").detach().cpu())
         count += n
     return {
         "samples": int(count),
         "next_state_mse_norm": state_sse / max(1, count),
         "next_progress_mse": progress_sse / max(1, count),
-        "next_reward_mse": reward_sse / max(1, count),
         "success_bce": success_loss / max(1, count),
     }
 
@@ -221,30 +217,25 @@ def _benchmark_score(correlation: dict, transition: dict) -> dict:
         ])
         if ood == 0.0:
             ood = ranking
-    reward_progress = 0.5 * (
-        _mse_like_score(transition.get("next_reward_mse"), scale=0.25)
-        + _mse_like_score(transition.get("next_progress_mse"), scale=0.05)
-    )
+    progress = _mse_like_score(transition.get("next_progress_mse"), scale=0.05)
     next_state = _mse_like_score(transition.get("next_state_mse_norm"), scale=0.05)
     weights = {
-        "policy_ranking_score": 0.50,
+        "policy_and_ood_ranking_score": 0.50,
         "success_calibration_score": 0.20,
-        "reward_progress_score": 0.15,
+        "progress_score": 0.15,
         "next_state_score": 0.10,
-        "ood_ranking_score": 0.05,
     }
     score = (
-        weights["policy_ranking_score"] * ranking
+        weights["policy_and_ood_ranking_score"] * (ranking + ood)
         + weights["success_calibration_score"] * calibration
-        + weights["reward_progress_score"] * reward_progress
+        + weights["progress_score"] * progress
         + weights["next_state_score"] * next_state
-        + weights["ood_ranking_score"] * ood
     )
     return {
         "world_model_benchmark_score": float(max(0.0, min(1.0, score))),
         "policy_ranking_score": float(ranking),
         "success_calibration_score": float(calibration),
-        "reward_progress_score": float(reward_progress),
+        "progress_score": float(progress),
         "next_state_score": float(next_state),
         "ood_ranking_score": float(ood),
         "policy_score_pearson": None if pearson is None else float(pearson),

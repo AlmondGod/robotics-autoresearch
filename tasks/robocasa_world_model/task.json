@@ -25,7 +25,7 @@
       "world_model_benchmark_score",
       "policy_ranking_score",
       "success_calibration_score",
-      "reward_progress_score",
+      "progress_score",
       "next_state_score",
       "ood_ranking_score",
       "reproducibility_integrity"
@@ -60,7 +60,7 @@
     "train_tasks": 5,
     "eval_tasks": 5,
     "input": "state_t, action_t, task_id, progress_t",
-    "targets": ["next_state", "next_task_progress", "next_reward", "task_success"],
+    "targets": ["next_state", "next_task_progress", "task_success"],
     "latent_prediction_allowed": true,
     "vae_allowed": true,
     "optional_action_free_video_pool": true,
@@ -95,23 +95,21 @@
   "metrics": {
     "primary": "world_model_benchmark_score",
     "score_weights": {
-      "policy_ranking_score": 0.50,
+      "policy_and_ood_ranking_score": 0.50,
       "success_calibration_score": 0.20,
-      "reward_progress_score": 0.15,
-      "next_state_score": 0.10,
-      "ood_ranking_score": 0.05
+      "progress_score": 0.15,
+      "next_state_score": 0.10
     },
     "secondary": [
       "policy_ranking_score",
       "success_calibration_score",
-      "reward_progress_score",
+      "progress_score",
       "next_state_score",
       "ood_ranking_score",
       "policy_score_spearman",
       "success_calibration_rmse",
       "next_state_mse_norm",
       "next_progress_mse",
-      "next_reward_mse",
       "success_bce"
     ]
   }

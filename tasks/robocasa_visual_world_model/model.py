@@ -195,7 +195,6 @@ class VisualRoboCasaWorldModel(nn.Module):
             "next_state": next_state,
             "next_latent": next_z,
             "next_progress": torch.sigmoid(self.dynamics.progress(hidden)),
-            "reward": self.dynamics.reward(hidden),
             "success_logit": self.dynamics.success(hidden),
             "next_rgb": next_rgb,
             "next_visual_latent": pred_visual_latent,
@@ -210,11 +209,8 @@ class VisualRoboCasaWorldModel(nn.Module):
         *,
         state_weight: float = 1.0,
         progress_weight: float = 0.25,
-        reward_weight: float = 0.25,
         success_weight: float = 0.25,
         visual_weight: float = 1.0,
-        visual_delta_weight: float = 0.25,
-        visual_latent_weight: float = 0.25,
         image_vae_weight: float = 0.25,
         visual_flow_weight: float = 0.5,
         state_flow_weight: float = 0.25,
@@ -230,16 +226,11 @@ class VisualRoboCasaWorldModel(nn.Module):
         )
         state_loss = F.mse_loss(out["next_state"], batch["next_state"])
         progress_loss = F.mse_loss(out["next_progress"], batch["next_progress"])
-        reward_loss = F.mse_loss(out["reward"], batch["reward"])
         success_loss = F.binary_cross_entropy_with_logits(out["success_logit"], batch["success"])
         rgb_loss = F.mse_loss(out["next_rgb"], batch["next_rgb"])
-        pred_delta = out["next_rgb"] - batch["rgb"]
-        true_delta = batch["next_rgb"] - batch["rgb"]
-        rgb_delta_loss = F.mse_loss(pred_delta, true_delta)
 
         next_visual, next_visual_mu, next_visual_logvar = self.image_vae.encode(batch["next_rgb"], sample=False)
         current_visual, current_visual_mu, current_visual_logvar = self.image_vae.encode(batch["rgb"], sample=False)
-        visual_latent_loss = F.mse_loss(out["next_visual_latent"], next_visual.detach())
         current_recon = self.image_vae.decode(current_visual)
         next_recon = self.image_vae.decode(next_visual)
         image_vae_loss = 0.5 * (F.mse_loss(current_recon, batch["rgb"]) + F.mse_loss(next_recon, batch["next_rgb"]))
@@ -263,11 +254,8 @@ class VisualRoboCasaWorldModel(nn.Module):
         total = (
             float(state_weight) * state_loss
             + float(progress_weight) * progress_loss
-            + float(reward_weight) * reward_loss
             + float(success_weight) * success_loss
             + float(visual_weight) * rgb_loss
-            + float(visual_delta_weight) * rgb_delta_loss
-            + float(visual_latent_weight) * visual_latent_loss
             + float(image_vae_weight) * image_vae_loss
             + float(visual_flow_weight) * visual_flow_loss
             + float(state_flow_weight) * state_flow_loss
@@ -278,11 +266,8 @@ class VisualRoboCasaWorldModel(nn.Module):
             "loss": total.detach(),
             "state_mse": state_loss.detach(),
             "progress_mse": progress_loss.detach(),
-            "reward_mse": reward_loss.detach(),
             "success_bce": success_loss.detach(),
             "rgb_mse": rgb_loss.detach(),
-            "rgb_delta_mse": rgb_delta_loss.detach(),
-            "visual_latent_mse": visual_latent_loss.detach(),
             "image_vae_mse": image_vae_loss.detach(),
             "visual_flow_mse": visual_flow_loss.detach(),
             "state_flow_mse": state_flow_loss.detach(),

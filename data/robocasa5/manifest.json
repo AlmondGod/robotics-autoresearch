@@ -13,19 +13,19 @@
   "task_count": 5,
   "tasks": [
     {
-      "alias": "OpenDrawer",
-      "available_demos": 102,
+      "alias": "OpenCabinet",
+      "available_demos": 107,
       "available_views": [
         "robot0_agentview_left",
         "robot0_agentview_right"
       ],
-      "dataset_path": "/Users/almondgod/robot-autoresearch/third_party/robocasa/datasets/v1.0/pretrain/atomic/OpenDrawer/20250819/lerobot",
-      "description": "Open a kitchen drawer.",
+      "dataset_path": "/Users/almondgod/robot-autoresearch/third_party/robocasa/datasets/v1.0/pretrain/atomic/OpenCabinet/20250819/lerobot",
+      "description": "Open a kitchen cabinet.",
       "exists": true,
       "filter_key": "100_demos",
-      "horizon": 750,
+      "horizon": 1050,
       "registered_demos": 100,
-      "robocasa_task": "OpenDrawer",
+      "robocasa_task": "OpenCabinet",
       "selected_demos": 50,
       "source": "human",
       "split": "pretrain",
@@ -108,7 +108,7 @@
       "task_id": 4
     }
   ],
-  "total_available_demos": 535,
+  "total_available_demos": 540,
   "total_registered_demos": 500,
   "total_selected_demos": 250,
   "views": [

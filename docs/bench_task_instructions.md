@@ -50,7 +50,7 @@ python3 tasks/robocasa_bc5/eval.py \
 
 ## `robocasa_bc5`
 
-- Optimize one policy for `OpenDrawer`, `CloseDrawer`, `CloseFridge`,
+- Optimize one policy for `OpenCabinet`, `CloseDrawer`, `CloseFridge`,
   `TurnOffStove`, `PickPlaceCounterToCabinet`.
 - Metric: rollout success rate over the five tasks.
 - Default eval: 10 episodes/task, max 260 steps, commit 16 unless checkpoint
@@ -153,9 +153,9 @@ python3 tasks/robocasa_stand_mixer_peak/eval.py \
   --device cuda
 ```
 
-## `robocasa_recap_offline`
+## `robocasa_offlinerl_posttraining`
 
-- Optimize `PickPlaceCounterToStandMixer` from demonstrations plus offline
+- Optimize `PickPlaceCounterToMicrowave` from demonstrations plus offline
   experience: failed rollouts, corrections, or other saved rollouts.
 - Metric: rollout success.
 - Do not use test-time demos.
@@ -163,19 +163,19 @@ python3 tasks/robocasa_stand_mixer_peak/eval.py \
 - Train:
 
 ```bash
-python3 tasks/robocasa_recap_offline/train.py \
-  --manifest data/autorobobench/robocasa_stand_mixer_peak_manifest.json \
-  --split data/autorobobench/robocasa_stand_mixer_peak_splits.json \
-  --out-dir runs/autorobobench/robocasa_recap_offline/<run> \
+python3 tasks/robocasa_offlinerl_posttraining/train.py \
+  --manifest data/autorobobench/robocasa_long_horizon_manifest.json \
+  --split data/autorobobench/robocasa_long_horizon_splits.json \
+  --out-dir runs/autorobobench/robocasa_offlinerl_posttraining/<run> \
   --device cuda
 ```
 
 - Eval:
 
 ```bash
-python3 tasks/robocasa_recap_offline/eval.py \
-  --checkpoint runs/autorobobench/robocasa_recap_offline/<run>/policy_best.pt \
-  --out runs/autorobobench/robocasa_recap_offline/<run>/eval_10.json \
+python3 tasks/robocasa_offlinerl_posttraining/eval.py \
+  --checkpoint runs/autorobobench/robocasa_offlinerl_posttraining/<run>/policy_best.pt \
+  --out runs/autorobobench/robocasa_offlinerl_posttraining/<run>/eval_10.json \
   --eval-episodes-per-task 10 \
   --device cuda
 ```
@@ -209,15 +209,14 @@ python3 tasks/robocasa_choose_measuring_cup_language/eval.py \
 
 ## `robocasa_long_horizon`
 
-- Optimize one policy for sequential tasks:
-  `PickPlaceCounterToStove`, `TurnOffStove`, `PickPlaceCounterToCabinet`.
+- Optimize one policy for `PickPlaceCounterToMicrowave`.
 - Metric: final success plus subgoal progress.
 - Default eval: 10 episodes/task, max 750 steps, commit 8.
 - Train:
 
 ```bash
 python3 tasks/robocasa_long_horizon/train.py \
-  --manifest data/robocasa5/manifest.json \
+  --manifest data/autorobobench/robocasa_long_horizon_manifest.json \
   --split data/autorobobench/robocasa_long_horizon_splits.json \
   --out-dir runs/autorobobench/robocasa_long_horizon/<run> \
   --device cuda
@@ -236,7 +235,7 @@ python3 tasks/robocasa_long_horizon/eval.py \
 
 - Train a state/action world model on BC5 transitions.
 - Inputs: `state_t`, `action_t`, `task_id`, progress.
-- Targets: next state, next progress, reward, success.
+- Targets: next state, next progress, success.
 - Metric: policy ranking/calibration against real rollout success plus
   transition prediction metrics.
 - This is not a policy rollout score.
@@ -263,7 +262,7 @@ python3 tasks/robocasa_world_model/eval.py \
 
 - Train a visual world model on BC5 transitions and videos.
 - Inputs: state, action, task, progress, current RGB.
-- Targets: next RGB, next state, next progress, reward, success.
+- Targets: next RGB, next state, next progress, success.
 - Metric: visual world-model score. LPIPS next-frame quality is the main term.
 - This is not a policy rollout score.
 - Train:
@@ -285,26 +284,26 @@ python3 tasks/robocasa_visual_world_model/eval.py \
   --device cuda
 ```
 
-## `robocasa_wm_policy_improvement`
+## `robocasa_world_model_posttraining`
 
-- Start from a differentiable BC5-compatible policy.
+- Start from the best differentiable `robocasa_long_horizon` policy.
 - Use a frozen world model to improve the policy offline.
 - Keep BC loss, init-policy anchor, and action penalty active. Real simulator
   success is final; WM objective alone is not enough.
 - Supported policy modes: temporal chunk BC, temporal chunk flow, sequence flow.
 - Unsupported for v0: trajectory banks, history policies, frozen VLM feature
   cache policies.
-- Default task: `TurnOnSinkFaucet` via
-  `data/autorobobench/robocasa_faucet_peak_manifest.json` and
-  `data/autorobobench/robocasa_faucet_peak_splits.json`.
-- Default checked-in WM-compatible base:
-  `data/autorobobench/pretrained_policies/robocasa_faucet_direct_bc_all_data_5min_seed0.pt`.
+- Default task: `PickPlaceCounterToMicrowave` via
+  `data/autorobobench/robocasa_long_horizon_manifest.json` and
+  `data/autorobobench/robocasa_long_horizon_splits.json`.
+- Default input policy path:
+  `runs/autorobobench/robocasa_long_horizon/baseline/policy_best.pt`.
 - Train:
 
 ```bash
-python3 tasks/robocasa_wm_policy_improvement/train.py \
+python3 tasks/robocasa_world_model_posttraining/train.py \
   --world-model-checkpoint <world_model.pt> \
-  --out-dir runs/autorobobench/robocasa_wm_policy_improvement/<run> \
+  --out-dir runs/autorobobench/robocasa_world_model_posttraining/<run> \
   --max-train-seconds 300 \
   --device cuda
 ```
@@ -312,26 +311,10 @@ python3 tasks/robocasa_wm_policy_improvement/train.py \
 - Eval:
 
 ```bash
-python3 tasks/robocasa_wm_policy_improvement/eval_parallel.py \
-  --checkpoint runs/autorobobench/robocasa_wm_policy_improvement/<run>/policy_best.pt \
-  --out runs/autorobobench/robocasa_wm_policy_improvement/<run>/eval.json \
+python3 tasks/robocasa_world_model_posttraining/eval_parallel.py \
+  --checkpoint runs/autorobobench/robocasa_world_model_posttraining/<run>/policy_best.pt \
+  --out runs/autorobobench/robocasa_world_model_posttraining/<run>/eval.json \
   --eval-episodes-per-task 10 \
-  --device cuda
-```
-
-## `robocasa_progress_predictor`
-
-- Train an auxiliary progress regressor on BC5 state/action/task data.
-- Metric: validation R2, MAE, RMSE, baseline RMSE.
-- This is not a rollout-success benchmark.
-- Train:
-
-```bash
-python3 -m tasks.robocasa_progress_predictor.train \
-  --manifest data/robocasa5/manifest.json \
-  --split data/autorobobench/robocasa_bc5_splits.json \
-  --out-dir runs/autorobobench/robocasa_progress_predictor/<run> \
-  --max-train-seconds 300 \
   --device cuda
 ```
 
@@ -359,30 +342,5 @@ python3 tasks/video_policy_transfer/train.py \
 python3 tasks/video_policy_transfer/eval.py \
   --checkpoint runs/autorobobench/video_policy_transfer/<run>/policy_best.pt \
   --out runs/autorobobench/video_policy_transfer/<run>/eval.json \
-  --device cuda
-```
-
-## `robotwin_bc3`
-
-- Train one RoboTwin policy for `blocks_ranking_rgb`, `place_a2b_left`,
-  `place_object_basket`.
-- This is not RoboCasa. Use RoboTwin data and eval scripts.
-- Training cap: 300 seconds.
-- Metric: success rate for online eval; heldout action MSE for offline eval.
-- Train:
-
-```bash
-python3 tasks/robotwin_bc3/train.py \
-  --split data/autorobobench/robotwin_bc3_splits.json \
-  --output-dir runs/autorobobench/robotwin_bc3/<run> \
-  --device cuda
-```
-
-- Eval:
-
-```bash
-python3 tasks/robotwin_bc3/eval.py \
-  --checkpoint runs/autorobobench/robotwin_bc3/<run>/policy_best.pt \
-  --out runs/autorobobench/robotwin_bc3/<run>/eval.json \
   --device cuda
 ```

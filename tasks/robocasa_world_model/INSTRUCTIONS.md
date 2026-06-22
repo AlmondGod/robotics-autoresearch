@@ -7,7 +7,7 @@ edit eval files or split files for scored runs.
 
 - Train a state/action world model on BC5 transitions.
 - Inputs: `state_t`, `action_t`, `task_id`, progress.
-- Targets: next state, next progress, reward, success.
+- Targets: next state, next progress, success.
 - Metric: policy ranking/calibration against real rollout success plus
   transition prediction metrics.
 - This is not a policy rollout score.

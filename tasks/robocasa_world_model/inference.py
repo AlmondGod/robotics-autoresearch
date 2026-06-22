@@ -53,7 +53,6 @@ def predict_next(world_model: dict, state: np.ndarray, action: np.ndarray, task_
     return {
         "next_state": next_state.squeeze(0).detach().cpu().numpy().astype(np.float32),
         "next_progress": float(out["next_progress"].squeeze().detach().cpu()),
-        "reward": float(out["reward"].squeeze().detach().cpu()),
         "success_prob": float(torch.sigmoid(out["success_logit"]).squeeze().detach().cpu()),
     }
 
@@ -69,7 +68,6 @@ def rollout_score(
 ) -> dict:
     state = np.asarray(initial_state, dtype=np.float32)
     actions = np.asarray(actions, dtype=np.float32)
-    rewards = []
     successes = []
     progress = float(initial_progress)
     states = [state.copy()]
@@ -77,16 +75,12 @@ def rollout_score(
         step = predict_next(world_model, state, action, int(task_id), progress)
         state = step["next_state"]
         progress = float(np.clip(step["next_progress"], 0.0, 1.0))
-        rewards.append(float(step["reward"]))
         successes.append(float(step["success_prob"]))
         states.append(state.copy())
     return {
         "predicted_success": float(max(successes) if successes else 0.0),
         "final_success_prob": float(successes[-1] if successes else 0.0),
-        "predicted_return": float(np.sum(rewards, dtype=np.float32)),
         "final_progress": float(progress),
         "states": np.asarray(states, dtype=np.float32),
         "success_trace": np.asarray(successes, dtype=np.float32),
-        "reward_trace": np.asarray(rewards, dtype=np.float32),
     }
-

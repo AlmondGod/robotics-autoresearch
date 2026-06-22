@@ -86,7 +86,7 @@ def plot(payload: dict, out: Path) -> None:
     ax_bar.legend(frameon=False, fontsize=9)
     ax_bar.grid(True, axis="y", color="#dddddd", linewidth=0.8)
 
-    metric_names = ["next_state_mse_norm", "next_progress_mse", "next_reward_mse", "success_bce"]
+    metric_names = ["next_state_mse_norm", "next_progress_mse", "success_bce"]
     metric_values = [float(metrics[name]) for name in metric_names]
     ax_metrics.barh(np.arange(len(metric_names)), metric_values, color=["#1b9e77", "#66a61e", "#e6ab02", "#d95f02"])
     ax_metrics.set_yticks(np.arange(len(metric_names)))

@@ -96,12 +96,10 @@ def _visual_transition_eval(
     sums = {
         "next_state_mse_norm": 0.0,
         "next_progress_mse": 0.0,
-        "next_reward_mse": 0.0,
         "success_bce": 0.0,
         "next_rgb_mse": 0.0,
         "next_rgb_mae": 0.0,
         "next_rgb_lpips": 0.0,
-        "next_rgb_delta_mse": 0.0,
     }
     count = 0
     for start in range(0, len(data), int(batch_size)):
@@ -112,19 +110,15 @@ def _visual_transition_eval(
             "next_state": torch.as_tensor(data.next_state[start:end], dtype=torch.float32, device=device),
             "progress": torch.as_tensor(data.progress[start:end], dtype=torch.float32, device=device),
             "next_progress": torch.as_tensor(data.next_progress[start:end], dtype=torch.float32, device=device),
-            "reward": torch.as_tensor(data.reward[start:end], dtype=torch.float32, device=device),
             "success": torch.as_tensor(data.success[start:end], dtype=torch.float32, device=device),
             "task_id": torch.as_tensor(data.task_id[start:end], dtype=torch.long, device=device),
             "rgb": torch.as_tensor(rgb[start:end], dtype=torch.float32, device=device),
             "next_rgb": torch.as_tensor(next_rgb[start:end], dtype=torch.float32, device=device),
         }
         out = model(batch["state"], batch["action"], batch["task_id"], batch["progress"])
-        pred_delta = out["next_rgb"] - batch["rgb"]
-        true_delta = batch["next_rgb"] - batch["rgb"]
         n = end - start
         sums["next_state_mse_norm"] += float((out["next_state"] - batch["next_state"]).square().mean(dim=-1).sum().detach().cpu())
         sums["next_progress_mse"] += float((out["next_progress"] - batch["next_progress"]).square().sum().detach().cpu())
-        sums["next_reward_mse"] += float((out["reward"] - batch["reward"]).square().sum().detach().cpu())
         sums["success_bce"] += float(torch.nn.functional.binary_cross_entropy_with_logits(out["success_logit"], batch["success"], reduction="sum").detach().cpu())
         sums["next_rgb_mse"] += float((out["next_rgb"] - batch["next_rgb"]).square().mean(dim=(1, 2, 3)).sum().detach().cpu())
         sums["next_rgb_mae"] += float((out["next_rgb"] - batch["next_rgb"]).abs().mean(dim=(1, 2, 3)).sum().detach().cpu())
@@ -135,7 +129,6 @@ def _visual_transition_eval(
             .detach()
             .cpu()
         )
-        sums["next_rgb_delta_mse"] += float((pred_delta - true_delta).square().mean(dim=(1, 2, 3)).sum().detach().cpu())
         count += n
     metrics = {key: value / max(1, count) for key, value in sums.items()}
     metrics["samples"] = int(count)
@@ -205,36 +198,29 @@ def _lpips_input(image: torch.Tensor, lpips_size: int) -> torch.Tensor:
 def _benchmark_score(metrics: dict[str, float]) -> dict[str, float | dict[str, float]]:
     visual_perceptual = _mse_like_score(metrics.get("next_rgb_lpips"), scale=0.5)
     visual_reconstruction = _mse_like_score(metrics.get("next_rgb_mse"), scale=0.08)
-    visual_delta = _mse_like_score(metrics.get("next_rgb_delta_mse"), scale=0.025)
     next_state = _mse_like_score(metrics.get("next_state_mse_norm"), scale=0.05)
-    reward_progress = 0.5 * (
-        _mse_like_score(metrics.get("next_reward_mse"), scale=0.25)
-        + _mse_like_score(metrics.get("next_progress_mse"), scale=0.05)
-    )
+    progress = _mse_like_score(metrics.get("next_progress_mse"), scale=0.05)
     success = _mse_like_score(metrics.get("success_bce"), scale=0.1)
     weights = {
         "visual_perceptual_score": 0.50,
-        "visual_reconstruction_score": 0.10,
-        "visual_delta_score": 0.15,
+        "visual_reconstruction_score": 0.25,
         "next_state_score": 0.15,
-        "reward_progress_score": 0.05,
+        "progress_score": 0.05,
         "success_score": 0.05,
     }
     score = (
         weights["visual_perceptual_score"] * visual_perceptual
         + weights["visual_reconstruction_score"] * visual_reconstruction
-        + weights["visual_delta_score"] * visual_delta
         + weights["next_state_score"] * next_state
-        + weights["reward_progress_score"] * reward_progress
+        + weights["progress_score"] * progress
         + weights["success_score"] * success
     )
     return {
         "visual_world_model_score": float(max(0.0, min(1.0, score))),
         "visual_perceptual_score": float(visual_perceptual),
         "visual_reconstruction_score": float(visual_reconstruction),
-        "visual_delta_score": float(visual_delta),
         "next_state_score": float(next_state),
-        "reward_progress_score": float(reward_progress),
+        "progress_score": float(progress),
         "success_score": float(success),
         "benchmark_score_weights": weights,
     }

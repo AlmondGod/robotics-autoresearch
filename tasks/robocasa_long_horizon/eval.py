@@ -26,7 +26,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Immutable evaluator for the long-horizon sequential RoboCasa task.")
     parser.add_argument("--checkpoint", "--policy", dest="checkpoint", required=True)
     parser.add_argument("--inference", default="tasks.robocasa_long_horizon.inference")
-    parser.add_argument("--manifest", default="data/robocasa5/manifest.json")
+    parser.add_argument("--manifest", default="data/autorobobench/robocasa_long_horizon_manifest.json")
     parser.add_argument("--split", default="data/autorobobench/robocasa_long_horizon_splits.json")
     parser.add_argument("--out", required=True)
     parser.add_argument("--camera", default="robot0_agentview_center")
@@ -81,6 +81,8 @@ def main() -> None:
             frames, success, steps, actions, success_trace = _rollout_episode(
                 dataset_root=dataset_root,
                 episode_idx=int(episode_id),
+                reset_state_index=0,
+                reset_perturbation={},
                 policy=policy,
                 inference=inference,
                 task=task,

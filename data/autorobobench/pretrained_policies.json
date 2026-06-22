@@ -83,7 +83,7 @@
       "differentiable": true,
       "wm_policy_improvement_supported": false,
       "artifact_status": "external_or_local_runs",
-      "notes": "Current best documented BC5 base in data/autorobobench/robocasa_world_model_policy_set.json, but not directly supported by robocasa_wm_policy_improvement v0 because v0 excludes history/frozen-VLM-cache policy modes."
+      "notes": "Current best documented BC5 base in data/autorobobench/robocasa_world_model_policy_set.json, but not directly supported by robocasa_world_model_posttraining v0 because v0 excludes history/frozen-VLM-cache policy modes."
     },
     {
       "name": "clip_5min_seed0",

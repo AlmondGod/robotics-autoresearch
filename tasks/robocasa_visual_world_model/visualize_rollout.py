@@ -99,7 +99,6 @@ def main() -> None:
                 "index": int(out_index),
                 "step": int(step),
                 "frame_idx": int(frame_idx),
-                "predicted_reward": float(pred["reward"]),
                 "predicted_success_prob": float(pred["success_prob"]),
                 "predicted_progress": float(pred["next_progress"]),
             }

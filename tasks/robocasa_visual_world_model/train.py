@@ -55,11 +55,8 @@ def main() -> None:
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--state-weight", type=float, default=1.0)
     parser.add_argument("--progress-weight", type=float, default=0.25)
-    parser.add_argument("--reward-weight", type=float, default=0.25)
     parser.add_argument("--success-weight", type=float, default=0.25)
     parser.add_argument("--visual-weight", type=float, default=1.0)
-    parser.add_argument("--visual-delta-weight", type=float, default=0.25)
-    parser.add_argument("--visual-latent-weight", type=float, default=0.25)
     parser.add_argument("--image-vae-weight", type=float, default=0.25)
     parser.add_argument("--visual-flow-weight", type=float, default=0.5)
     parser.add_argument("--state-flow-weight", type=float, default=0.25)
@@ -129,11 +126,8 @@ def main() -> None:
             batch,
             state_weight=float(args.state_weight),
             progress_weight=float(args.progress_weight),
-            reward_weight=float(args.reward_weight),
             success_weight=float(args.success_weight),
             visual_weight=float(args.visual_weight),
-            visual_delta_weight=float(args.visual_delta_weight),
-            visual_latent_weight=float(args.visual_latent_weight),
             image_vae_weight=float(args.image_vae_weight),
             visual_flow_weight=float(args.visual_flow_weight),
             state_flow_weight=float(args.state_flow_weight),
@@ -197,7 +191,6 @@ def _batch(
         "next_state": torch.as_tensor(data.next_state[idx], dtype=torch.float32, device=device),
         "progress": torch.as_tensor(data.progress[idx], dtype=torch.float32, device=device),
         "next_progress": torch.as_tensor(data.next_progress[idx], dtype=torch.float32, device=device),
-        "reward": torch.as_tensor(data.reward[idx], dtype=torch.float32, device=device),
         "success": torch.as_tensor(data.success[idx], dtype=torch.float32, device=device),
         "task_id": torch.as_tensor(data.task_id[idx], dtype=torch.long, device=device),
         "rgb": torch.as_tensor(rgb[idx], dtype=torch.float32, device=device),
@@ -344,10 +337,8 @@ def _eval(
     sums = {
         "state_mse": 0.0,
         "progress_mse": 0.0,
-        "reward_mse": 0.0,
         "success_bce": 0.0,
         "rgb_mse": 0.0,
-        "rgb_delta_mse": 0.0,
         "visual_score_loss": 0.0,
     }
     count = 0
@@ -358,7 +349,7 @@ def _eval(
         n = len(idx)
         for key in sums:
             if key == "visual_score_loss":
-                value = metrics["rgb_mse"] + 0.25 * metrics["rgb_delta_mse"] + 0.25 * metrics["state_mse"]
+                value = metrics["rgb_mse"] + 0.25 * metrics["state_mse"]
             else:
                 value = metrics[key]
             sums[key] += float(value.detach().cpu()) * n
@@ -421,7 +412,6 @@ def _flow_matching_summary(args: argparse.Namespace) -> dict:
     return {
         "image_vae_enabled": True,
         "visual_latent_dim": int(args.visual_latent_dim),
-        "visual_latent_weight": float(args.visual_latent_weight),
         "image_vae_weight": float(args.image_vae_weight),
         "visual_flow_weight": float(args.visual_flow_weight),
         "state_flow_weight": float(args.state_flow_weight),

@@ -17,11 +17,12 @@ ensure_robocasa_runtime()
 
 
 DEFAULT_SPLIT = Path("data/autorobobench/robocasa_long_horizon_splits.json")
+DEFAULT_MANIFEST = Path("data/autorobobench/robocasa_long_horizon_manifest.json")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="One-time setup verifier for the long-horizon sequential RoboCasa task.")
-    parser.add_argument("--manifest", default="data/robocasa5/manifest.json")
+    parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
     parser.add_argument("--split", default=str(DEFAULT_SPLIT))
     parser.add_argument("--verify", action="store_true", help="Verify required local files and datasets exist.")
     args = parser.parse_args()

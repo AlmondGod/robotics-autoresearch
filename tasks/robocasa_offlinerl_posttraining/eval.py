@@ -12,8 +12,8 @@ sys.path.insert(0, str(ROOT))
 from tasks.robocasa_bc5.eval import main as robocasa_bc5_eval_main
 
 
-FROZEN_MANIFEST = "data/autorobobench/robocasa_stand_mixer_peak_manifest.json"
-FROZEN_SPLIT = "data/autorobobench/robocasa_stand_mixer_peak_splits.json"
+FROZEN_MANIFEST = "data/autorobobench/robocasa_long_horizon_manifest.json"
+FROZEN_SPLIT = "data/autorobobench/robocasa_long_horizon_splits.json"
 
 
 def main() -> None:
@@ -23,17 +23,17 @@ def main() -> None:
     _default("--max-steps", "750")
     _default("--commit-steps", "8")
     if not any(arg == "--inference" or arg.startswith("--inference=") for arg in sys.argv):
-        sys.argv.extend(["--inference", "tasks.robocasa_recap_offline.inference"])
+        sys.argv.extend(["--inference", "tasks.robocasa_offlinerl_posttraining.inference"])
     robocasa_bc5_eval_main()
     if out_path:
         out = Path(out_path)
         if out.exists():
             payload = json.loads(out.read_text())
-            payload["track"] = "robocasa_recap_offline"
+            payload["track"] = "robocasa_offlinerl_posttraining"
             payload["manifest"] = FROZEN_MANIFEST
             payload["split"] = FROZEN_SPLIT
-            payload["target_task"] = "PickPlaceCounterToStandMixer"
-            payload["recap_final_success"] = float(payload.get("success_rate", 0.0))
+            payload["target_task"] = "PickPlaceCounterToMicrowave"
+            payload["offlinerl_final_success"] = float(payload.get("success_rate", 0.0))
             out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 

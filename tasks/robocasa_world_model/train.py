@@ -68,7 +68,6 @@ def main() -> None:
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--state-weight", type=float, default=1.0)
     parser.add_argument("--progress-weight", type=float, default=0.25)
-    parser.add_argument("--reward-weight", type=float, default=0.25)
     parser.add_argument("--success-weight", type=float, default=0.25)
     parser.add_argument("--kl-weight", type=float, default=1e-4)
     parser.add_argument("--seed", type=int, default=0)
@@ -149,7 +148,6 @@ def main() -> None:
             batch,
             state_weight=float(args.state_weight),
             progress_weight=float(args.progress_weight),
-            reward_weight=float(args.reward_weight),
             success_weight=float(args.success_weight),
             kl_weight=float(args.kl_weight),
         )
@@ -229,7 +227,6 @@ def _batch(data: TransitionData, idx: np.ndarray, device: torch.device) -> dict[
         "next_state": torch.as_tensor(data.next_state[idx], dtype=torch.float32, device=device),
         "progress": torch.as_tensor(data.progress[idx], dtype=torch.float32, device=device),
         "next_progress": torch.as_tensor(data.next_progress[idx], dtype=torch.float32, device=device),
-        "reward": torch.as_tensor(data.reward[idx], dtype=torch.float32, device=device),
         "success": torch.as_tensor(data.success[idx], dtype=torch.float32, device=device),
         "task_id": torch.as_tensor(data.task_id[idx], dtype=torch.long, device=device),
     }
@@ -449,7 +446,6 @@ def _eval(model: RoboCasaWorldModel, data: TransitionData, batch_size: int, devi
     sums: dict[str, float] = {
         "state_mse": 0.0,
         "progress_mse": 0.0,
-        "reward_mse": 0.0,
         "success_bce": 0.0,
         "score_loss": 0.0,
     }
@@ -459,7 +455,7 @@ def _eval(model: RoboCasaWorldModel, data: TransitionData, batch_size: int, devi
         batch = _batch(data, idx, device)
         total, metrics = model.loss(batch)
         n = len(idx)
-        for key in ("state_mse", "progress_mse", "reward_mse", "success_bce"):
+        for key in ("state_mse", "progress_mse", "success_bce"):
             sums[key] += float(metrics[key].detach().cpu()) * n
         sums["score_loss"] += float(total.detach().cpu()) * n
         count += n

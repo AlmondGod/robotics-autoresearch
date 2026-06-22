@@ -29,8 +29,8 @@ def load_policy(checkpoint: str, device: str = "auto") -> Policy:
     torch_device = device_from_arg(device)
     payload = torch.load(Path(checkpoint), map_location=torch_device, weights_only=False)
     policy_type = str(payload.get("policy_type", ""))
-    if policy_type != "autorobobench_robocasa_recap_offline":
-        raise ValueError(f"expected robocasa_recap_offline checkpoint, got policy_type={policy_type!r}")
+    if policy_type != "autorobobench_robocasa_offlinerl_posttraining":
+        raise ValueError(f"expected robocasa_offlinerl_posttraining checkpoint, got policy_type={policy_type!r}")
     model = RoboCasaTemporalChunkBC(
         proprio_dim=int(payload["proprio_dim"]),
         chunk_horizon=int(payload["chunk_horizon"]),

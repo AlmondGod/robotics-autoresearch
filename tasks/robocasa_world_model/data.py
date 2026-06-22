@@ -27,7 +27,6 @@ class TransitionData:
     next_state: np.ndarray
     progress: np.ndarray
     next_progress: np.ndarray
-    reward: np.ndarray
     success: np.ndarray
     task_id: np.ndarray
     episode_id: np.ndarray
@@ -226,7 +225,6 @@ def load_episode_transitions(dataset_root: Path, episode_id: int, task_id: int, 
     rows = np.arange(0, n - 1, max(1, frame_stride), dtype=np.int32)
     progress = rows.astype(np.float32) / max(1, n - 1)
     next_progress = (rows + 1).astype(np.float32) / max(1, n - 1)
-    reward = _episode_reward(frame, rows, n)
     success = _episode_success(frame, rows, n)
     return {
         "state": state[rows].astype(np.float32),
@@ -234,23 +232,11 @@ def load_episode_transitions(dataset_root: Path, episode_id: int, task_id: int, 
         "next_state": state[rows + 1].astype(np.float32),
         "progress": progress[:, None].astype(np.float32),
         "next_progress": next_progress[:, None].astype(np.float32),
-        "reward": reward[:, None].astype(np.float32),
         "success": success[:, None].astype(np.float32),
         "task_id": np.full((len(rows),), int(task_id), dtype=np.int64),
         "episode_id": np.full((len(rows),), int(episode_id), dtype=np.int32),
         "frame_idx": rows.astype(np.int32),
     }
-
-
-def _episode_reward(frame: pd.DataFrame, rows: np.ndarray, n: int) -> np.ndarray:
-    for key in ("next.reward", "reward"):
-        if key in frame:
-            values = np.asarray(frame[key].to_numpy(), dtype=np.float32).reshape(-1)
-            return values[np.minimum(rows + 1, len(values) - 1)]
-    reward = np.zeros((len(rows),), dtype=np.float32)
-    if len(reward):
-        reward[-1] = 1.0
-    return reward
 
 
 def _episode_success(frame: pd.DataFrame, rows: np.ndarray, n: int) -> np.ndarray:
@@ -291,7 +277,6 @@ def _concat(parts: list[dict[str, np.ndarray]]) -> TransitionData:
             next_state=np.zeros((0, 1), dtype=np.float32),
             progress=np.zeros((0, 1), dtype=np.float32),
             next_progress=np.zeros((0, 1), dtype=np.float32),
-            reward=np.zeros((0, 1), dtype=np.float32),
             success=np.zeros((0, 1), dtype=np.float32),
             task_id=np.zeros((0,), dtype=np.int64),
             episode_id=np.zeros((0,), dtype=np.int32),
@@ -307,7 +292,6 @@ def _empty_part(state_dim: int, action_dim: int) -> dict[str, np.ndarray]:
         "next_state": np.zeros((0, int(state_dim)), dtype=np.float32),
         "progress": np.zeros((0, 1), dtype=np.float32),
         "next_progress": np.zeros((0, 1), dtype=np.float32),
-        "reward": np.zeros((0, 1), dtype=np.float32),
         "success": np.zeros((0, 1), dtype=np.float32),
         "task_id": np.zeros((0,), dtype=np.int64),
         "episode_id": np.zeros((0,), dtype=np.int32),
@@ -328,7 +312,6 @@ def normalize_data(data: TransitionData, stats: dict[str, np.ndarray]) -> Transi
         next_state=((data.next_state - stats["state_mean"]) / stats["state_std"]).astype(np.float32),
         progress=data.progress.astype(np.float32),
         next_progress=data.next_progress.astype(np.float32),
-        reward=data.reward.astype(np.float32),
         success=data.success.astype(np.float32),
         task_id=data.task_id.astype(np.int64),
         episode_id=data.episode_id.astype(np.int32),

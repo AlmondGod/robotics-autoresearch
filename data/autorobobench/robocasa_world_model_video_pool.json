@@ -97,7 +97,7 @@
   ],
   "notes": [
     "This pool is optional. Baseline world-model training ignores it unless the mutable train code opts in.",
-    "The pool intentionally exposes RGB video paths only; benchmark-compliant methods should not read actions, states, rewards, or proprio for these episodes.",
+    "The pool intentionally exposes RGB video paths only; benchmark-compliant methods should not read actions, states, task labels, or proprio for these episodes.",
     "Using this pool for action-conditioned world-model learning requires an auxiliary strategy such as inverse dynamics, video representation learning, latent consistency, or self-supervised future prediction.",
     "In-task video episodes start at 20 so they do not overlap the default 20 action-labeled train rollouts per task."
   ]

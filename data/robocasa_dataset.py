@@ -13,9 +13,9 @@ DEFAULT_VIEWS = [
 DEFAULT_TASKS = [
     {
         "task_id": 0,
-        "alias": "OpenDrawer",
-        "robocasa_task": "OpenDrawer",
-        "description": "Open a kitchen drawer.",
+        "alias": "OpenCabinet",
+        "robocasa_task": "OpenCabinet",
+        "description": "Open a kitchen cabinet.",
     },
     {
         "task_id": 1,

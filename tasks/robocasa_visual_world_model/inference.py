@@ -55,7 +55,6 @@ def predict_next(world_model: dict, state: np.ndarray, action: np.ndarray, task_
     return {
         "next_state": next_state.squeeze(0).detach().cpu().numpy().astype(np.float32),
         "next_progress": float(out["next_progress"].squeeze().detach().cpu()),
-        "reward": float(out["reward"].squeeze().detach().cpu()),
         "success_prob": float(torch.sigmoid(out["success_logit"]).squeeze().detach().cpu()),
         "next_rgb": out["next_rgb"].squeeze(0).detach().cpu().numpy().astype(np.float32),
     }

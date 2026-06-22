@@ -5,8 +5,7 @@ edit eval files or split files for scored runs.
 
 ## Task
 
-- Optimize one policy for sequential tasks:
-  `PickPlaceCounterToStove`, `TurnOffStove`, `PickPlaceCounterToCabinet`.
+- Optimize one policy for `PickPlaceCounterToMicrowave`.
 - Metric: final success plus subgoal progress.
 - Default eval: 10 episodes/task, max 750 steps, commit 8.
 
@@ -14,7 +13,7 @@ edit eval files or split files for scored runs.
 
 ```bash
 python3 tasks/robocasa_long_horizon/train.py \
-  --manifest data/robocasa5/manifest.json \
+  --manifest data/autorobobench/robocasa_long_horizon_manifest.json \
   --split data/autorobobench/robocasa_long_horizon_splits.json \
   --out-dir runs/autorobobench/robocasa_long_horizon/<run> \
   --device cuda

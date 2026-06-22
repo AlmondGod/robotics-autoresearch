@@ -35,14 +35,13 @@ from train.train_autorobobench_robocasa_bc5 import (
 ensure_robocasa_runtime()
 
 
-FROZEN_MANIFEST = "data/autorobobench/robocasa_stand_mixer_peak_manifest.json"
-FROZEN_SPLIT = "data/autorobobench/robocasa_stand_mixer_peak_splits.json"
+FROZEN_MANIFEST = "data/autorobobench/robocasa_long_horizon_manifest.json"
+FROZEN_SPLIT = "data/autorobobench/robocasa_long_horizon_splits.json"
 DEFAULT_INIT_CHECKPOINT = "auto"
 INIT_CHECKPOINT_CANDIDATES = (
-    "runs/autorobobench/robocasa_stand_mixer_peak/a100_5min_seed0/policy_best.pt",
-    "runs/autorobobench/robocasa_stand_mixer_peak/a100_5min_full_seed0/policy_best.pt",
-    "runs/autorobobench/robocasa_stand_mixer_peak/"
-    "temporal_bc_mwinit_1600_seed0/policy_best.pt",
+    "runs/autorobobench/robocasa_long_horizon/baseline/policy_best.pt",
+    "runs/autorobobench/robocasa_long_horizon/a100_5min_seed0/policy_best.pt",
+    "runs/autorobobench/robocasa_long_horizon/a100_5min_full_seed0/policy_best.pt",
 )
 
 
@@ -55,10 +54,10 @@ class RecapData:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train a RECAP-style offline RoboCasa policy.")
+    parser = argparse.ArgumentParser(description="Train an offline-RL posttraining RoboCasa policy.")
     parser.add_argument("--manifest", default=FROZEN_MANIFEST)
     parser.add_argument("--split", default=FROZEN_SPLIT)
-    parser.add_argument("--out-dir", default="runs/autorobobench/robocasa_recap_offline/stand_mixer")
+    parser.add_argument("--out-dir", default="runs/autorobobench/robocasa_offlinerl_posttraining/microwave")
     parser.add_argument("--train-episodes-per-task", type=int, default=80)
     parser.add_argument("--val-episodes-per-task", type=int, default=10)
     parser.add_argument("--task-alias", action="append", default=[])
@@ -198,7 +197,7 @@ def main() -> None:
     }
     checkpoint = {
         "state_dict": _state_dict_cpu(model),
-        "policy_type": "autorobobench_robocasa_recap_offline",
+        "policy_type": "autorobobench_robocasa_offlinerl_posttraining",
         "chunk_horizon": int(args.chunk_horizon),
         "action_dim": int(train_data.actions.shape[-1]),
         "proprio_dim": int(train_data.proprio.shape[-1]),

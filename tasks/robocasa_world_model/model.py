@@ -39,7 +39,6 @@ class RoboCasaWorldModel(nn.Module):
         self.trunk = _mlp(inp, width, width, depth, dropout, final_norm=True)
         self.delta = nn.Linear(width, state_width)
         self.progress = nn.Linear(width, 1)
-        self.reward = nn.Linear(width, 1)
         self.success = nn.Linear(width, 1)
 
     def encode_state(self, state: torch.Tensor, *, sample: bool = False) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -80,7 +79,6 @@ class RoboCasaWorldModel(nn.Module):
             "next_state": next_state,
             "next_latent": next_z,
             "next_progress": torch.sigmoid(self.progress(h)),
-            "reward": self.reward(h),
             "success_logit": self.success(h),
             "latent_mu": mu,
             "latent_logvar": logvar,
@@ -92,7 +90,6 @@ class RoboCasaWorldModel(nn.Module):
         *,
         state_weight: float = 1.0,
         progress_weight: float = 0.25,
-        reward_weight: float = 0.25,
         success_weight: float = 0.25,
         kl_weight: float = 1e-4,
     ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
@@ -105,7 +102,6 @@ class RoboCasaWorldModel(nn.Module):
         )
         state_loss = F.mse_loss(out["next_state"], batch["next_state"])
         progress_loss = F.mse_loss(out["next_progress"], batch["next_progress"])
-        reward_loss = F.mse_loss(out["reward"], batch["reward"])
         success_loss = F.binary_cross_entropy_with_logits(out["success_logit"], batch["success"])
         if self.latent_dim > 0:
             mu = out["latent_mu"]
@@ -116,7 +112,6 @@ class RoboCasaWorldModel(nn.Module):
         total = (
             float(state_weight) * state_loss
             + float(progress_weight) * progress_loss
-            + float(reward_weight) * reward_loss
             + float(success_weight) * success_loss
             + float(kl_weight) * kl
         )
@@ -124,7 +119,6 @@ class RoboCasaWorldModel(nn.Module):
             "loss": total.detach(),
             "state_mse": state_loss.detach(),
             "progress_mse": progress_loss.detach(),
-            "reward_mse": reward_loss.detach(),
             "success_bce": success_loss.detach(),
             "kl": kl.detach(),
         }
@@ -156,4 +150,3 @@ def _mlp(
         layers.append(nn.LayerNorm(dim))
     layers.append(nn.Linear(dim, int(out_dim)))
     return nn.Sequential(*layers)
-

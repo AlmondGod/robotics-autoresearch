@@ -18,24 +18,22 @@ Current repo state after the single-task policy work:
   `tasks/robocasa_bc5/inference.py`,
   `tasks/robocasa_bc5/eval_parallel.py`,
   `tasks/robocasa_bc5/build_trajectory_bank.py`,
-  `tasks/robocasa_progress_predictor/train.py`,
-  `tasks/robocasa_wm_policy_improvement/selector_inference.py`, and
+  `tasks/robocasa_world_model_posttraining/selector_inference.py`, and
   `autorobobench/policy_artifacts.py`.
 
 ## Configured Bench Tasks
 
 | Bench task | Current RoboCasa task(s) | Manifest | Split |
 |---|---|---|---|
-| `robocasa_bc5` | `OpenDrawer`, `CloseDrawer`, `CloseFridge`, `TurnOffStove`, `PickPlaceCounterToCabinet` | `data/robocasa5/manifest.json` | `data/autorobobench/robocasa_bc5_splits.json` |
+| `robocasa_bc5` | `OpenCabinet`, `CloseDrawer`, `CloseFridge`, `TurnOffStove`, `PickPlaceCounterToCabinet` | `data/robocasa5/manifest.json` | `data/autorobobench/robocasa_bc5_splits.json` |
 | `robocasa_world_model` | same as `robocasa_bc5` | `data/robocasa5/manifest.json` | `data/autorobobench/robocasa_bc5_splits.json` |
 | `robocasa_visual_world_model` | same as `robocasa_bc5` | `data/robocasa5/manifest.json` | `data/autorobobench/robocasa_bc5_splits.json` |
-| `robocasa_wm_policy_improvement` | `TurnOnSinkFaucet` | `data/autorobobench/robocasa_faucet_peak_manifest.json` | `data/autorobobench/robocasa_faucet_peak_splits.json` |
-| `robocasa_progress_predictor` | same as `robocasa_bc5` | `data/robocasa5/manifest.json` | `data/autorobobench/robocasa_bc5_splits.json` |
+| `robocasa_world_model_posttraining` | `PickPlaceCounterToMicrowave` | `data/autorobobench/robocasa_long_horizon_manifest.json` | `data/autorobobench/robocasa_long_horizon_splits.json` |
 | `robocasa_faucet_peak` | `TurnOnSinkFaucet` | `data/autorobobench/robocasa_faucet_peak_manifest.json` | `data/autorobobench/robocasa_faucet_peak_splits.json` |
 | `robocasa_stand_mixer_peak` | `PickPlaceCounterToStandMixer` | `data/autorobobench/robocasa_stand_mixer_peak_manifest.json` | `data/autorobobench/robocasa_stand_mixer_peak_splits.json` |
-| `robocasa_recap_offline` | `PickPlaceCounterToStandMixer` | `data/autorobobench/robocasa_stand_mixer_peak_manifest.json` | `data/autorobobench/robocasa_stand_mixer_peak_splits.json` |
+| `robocasa_offlinerl_posttraining` | `PickPlaceCounterToMicrowave` | `data/autorobobench/robocasa_long_horizon_manifest.json` | `data/autorobobench/robocasa_long_horizon_splits.json` |
 | `robocasa_choose_measuring_cup_language` | `ChooseMeasuringCupLeftLarger`, `ChooseMeasuringCupLeftSmaller`, `ChooseMeasuringCupRightLarger`, `ChooseMeasuringCupRightSmaller` | `data/autorobobench/robocasa_choose_measuring_cup_language_manifest.json` | `data/autorobobench/robocasa_choose_measuring_cup_language_splits.json` |
-| `robocasa_long_horizon` | `PickPlaceCounterToStove`, `TurnOffStove`, `PickPlaceCounterToCabinet` | `data/robocasa5/manifest.json` | `data/autorobobench/robocasa_long_horizon_splits.json` |
+| `robocasa_long_horizon` | `PickPlaceCounterToMicrowave` | `data/autorobobench/robocasa_long_horizon_manifest.json` | `data/autorobobench/robocasa_long_horizon_splits.json` |
 
 Additional single-task/debug splits currently exist for `CloseFridge`,
 `CloseCabinet`, and same-setting `TurnOnSinkFaucet`.
@@ -56,17 +54,17 @@ Additional single-task/debug splits currently exist for `CloseFridge`,
 | `robocasa_close_cabinet_peak` / `CloseCabinet` | `five_min_frozen_clip_seed0` | learned frozen CLIP flow | 4 | 0 | 0 | `runs/autorobobench/robocasa_close_cabinet_peak/five_min_frozen_clip_seed0/eval_4_max400.json` |
 | `robocasa_stand_mixer_peak` / `PickPlaceCounterToStandMixer` | `a100_5min_full_seed0` | learned BC | 10 | 0 | 0 | `runs/autorobobench/robocasa_stand_mixer_peak/a100_5min_full_seed0/eval_10.json` |
 | `robocasa_stand_mixer_peak` / `PickPlaceCounterToStandMixer` | `a100_smolvlm_flow_5min_seed0` | learned frozen SmolVLM flow | 10 | 0 | 0 | `runs/autorobobench/robocasa_stand_mixer_peak/a100_smolvlm_flow_5min_seed0/eval_10.json` |
-| `robocasa_recap_offline` / `PickPlaceCounterToStandMixer` | `stand_mixer_a100_5min_init` | learned BC init | 10 | 0 | 0 | `runs/autorobobench/robocasa_recap_offline/stand_mixer_a100_5min_init/eval_10.json` |
+| `robocasa_offlinerl_posttraining` / `PickPlaceCounterToMicrowave` | not yet measured after retarget | learned posttraining | 0 | 0 | 0 | n/a |
 | `video_policy_transfer` / BC5 tasks | `scarce_paired_bc` | learned transfer policy | 5 | 0 | 0 | `runs/autorobobench/video_policy_transfer/scarce_paired_bc/eval_smoke_1per_task.json` |
 | `video_policy_transfer` / BC5 tasks | `smolvlm_5min` | learned transfer policy | 5 | 0 | 0 | `runs/autorobobench/video_policy_transfer/smolvlm_5min/eval_smoke_1per_task.json` |
 | `video_policy_transfer` / BC5 tasks | `vit_act_5min` | learned transfer policy | 5 | 0 | 0 | `runs/autorobobench/video_policy_transfer/vit_act_5min/eval_smoke_1per_task.json` |
 
 ## Current BC5 Per-Task Rates
 
-The current BC5 split is `OpenDrawer`, `CloseDrawer`, `CloseFridge`,
+The current BC5 split is `OpenCabinet`, `CloseDrawer`, `CloseFridge`,
 `TurnOffStove`, `PickPlaceCounterToCabinet`.
 
-| Policy | Overall /100 | OpenDrawer | CloseDrawer | CloseFridge | TurnOffStove | PickPlaceCounterToCabinet | Source |
+| Policy | Overall /100 | OpenCabinet | CloseDrawer | CloseFridge | TurnOffStove | PickPlaceCounterToCabinet | Source |
 |---|---:|---:|---:|---:|---:|---:|---|
 | `autoresearch_full_history_act_seed0`, fixed inference | 8 | 0 | 40 | 0 | 0 | 0 | `runs/autorobobench/robocasa_bc5/autoresearch_full_history_act_seed0/eval_10_per_task_after_horizon_fix_parallel_10w.json` |
 | `bc_simple_chunk32_progress750_commit8_240s_seed0` | 0 | 0 | 0 | 0 | 0 | 0 | `runs/autorobobench/robocasa_bc5/bc_simple_chunk32_progress750_commit8_240s_seed0/eval_10_per_task_parallel_10w.json` |
@@ -77,16 +75,3 @@ stored at
 `runs/autorobobench/robocasa_bc5/autoresearch_clip_recede4_open_only/eval_10_per_task_local.json`.
 It predates the latest exact current-split reporting and should be treated as a
 historical aggregate, not the clean per-task table above.
-
-## Auxiliary Metrics
-
-`robocasa_progress_predictor` is not a rollout-success benchmark. The current
-state/action progress predictor run completed in 7.7 seconds with:
-
-- validation MAE: `0.111955`
-- validation RMSE: `0.192321`
-- validation R2: `0.557839`
-- task-mean baseline RMSE: `0.289224`
-
-Source:
-`data/autorobobench/robocasa_progress_predictor_bc5_state_action_5min_metrics.json`

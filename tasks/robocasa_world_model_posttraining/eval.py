@@ -8,20 +8,20 @@ if str(ROOT) in sys.path:
     sys.path.remove(str(ROOT))
 sys.path.insert(0, str(ROOT))
 
-DEFAULT_MANIFEST = "data/autorobobench/robocasa_faucet_peak_manifest.json"
-DEFAULT_SPLIT = "data/autorobobench/robocasa_faucet_peak_splits.json"
+DEFAULT_MANIFEST = "data/autorobobench/robocasa_long_horizon_manifest.json"
+DEFAULT_SPLIT = "data/autorobobench/robocasa_long_horizon_splits.json"
 
 
 def main() -> None:
     _default("--manifest", DEFAULT_MANIFEST)
     _default("--split", DEFAULT_SPLIT)
-    _default("--inference", "tasks.robocasa_wm_policy_improvement.inference")
+    _default("--inference", "tasks.robocasa_world_model_posttraining.inference")
     _default("--max-steps", "750")
     _default("--commit-steps", "8")
 
-    from tasks.robocasa_bc5.eval_parallel import main as robocasa_eval_parallel_main
+    from tasks.robocasa_bc5.eval import main as robocasa_eval_main
 
-    robocasa_eval_parallel_main()
+    robocasa_eval_main()
 
 
 def _default(flag: str, value: str) -> None:

@@ -18,19 +18,17 @@
     "higher_is_better": true,
     "score_weights": {
       "visual_perceptual_score": 0.50,
-      "visual_reconstruction_score": 0.10,
-      "visual_delta_score": 0.15,
+      "visual_reconstruction_score": 0.25,
       "next_state_score": 0.15,
-      "reward_progress_score": 0.05,
+      "progress_score": 0.05,
       "success_score": 0.05
     },
     "required_result_keys": [
       "visual_world_model_score",
       "visual_perceptual_score",
       "visual_reconstruction_score",
-      "visual_delta_score",
       "next_state_score",
-      "reward_progress_score",
+      "progress_score",
       "success_score",
       "reproducibility_integrity"
     ],
@@ -54,7 +52,7 @@
       "data/robocasa5/manifest.json",
       "data/autorobobench/robocasa_bc5_splits.json"
     ],
-    "notes": "Learned RoboCasa world-model track scored mainly by held-out LPIPS next-frame visual accuracy from real RoboCasa videos, plus pixel/delta/state/progress/reward consistency."
+    "notes": "Learned RoboCasa world-model track scored mainly by held-out LPIPS next-frame visual accuracy from real RoboCasa videos, plus pixel/state/progress/success consistency."
   },
   "train_contract": {
     "train_tasks": 5,
@@ -64,7 +62,6 @@
       "next_rgb_frame",
       "next_state",
       "next_task_progress",
-      "next_reward",
       "task_success"
     ],
     "default_action_labeled_train_rollouts_per_task": 20,
@@ -94,8 +91,6 @@
     "latent_dim": 64,
     "visual_latent_dim": 64,
     "visual_weight": 1.0,
-    "visual_delta_weight": 0.25,
-    "visual_latent_weight": 0.25,
     "image_vae_weight": 0.25,
     "visual_flow_weight": 0.5,
     "state_flow_weight": 0.25,
@@ -105,26 +100,22 @@
     "primary": "visual_world_model_score",
     "score_weights": {
       "visual_perceptual_score": 0.50,
-      "visual_reconstruction_score": 0.10,
-      "visual_delta_score": 0.15,
+      "visual_reconstruction_score": 0.25,
       "next_state_score": 0.15,
-      "reward_progress_score": 0.05,
+      "progress_score": 0.05,
       "success_score": 0.05
     },
     "secondary": [
       "visual_perceptual_score",
       "visual_reconstruction_score",
-      "visual_delta_score",
       "next_state_score",
-      "reward_progress_score",
+      "progress_score",
       "success_score",
       "next_rgb_lpips",
       "next_rgb_mse",
       "next_rgb_psnr",
-      "next_rgb_delta_mse",
       "next_state_mse_norm",
       "next_progress_mse",
-      "next_reward_mse",
       "success_bce"
     ]
   }

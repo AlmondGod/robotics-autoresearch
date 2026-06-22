@@ -16,12 +16,12 @@ from autorobobench.robocasa_runtime import ensure_robocasa_runtime
 ensure_robocasa_runtime()
 
 
-FROZEN_MANIFEST = "data/autorobobench/robocasa_stand_mixer_peak_manifest.json"
-FROZEN_SPLIT = "data/autorobobench/robocasa_stand_mixer_peak_splits.json"
+FROZEN_MANIFEST = "data/autorobobench/robocasa_long_horizon_manifest.json"
+FROZEN_SPLIT = "data/autorobobench/robocasa_long_horizon_splits.json"
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Setup verifier for the RoboCasa RECAP-style offline task.")
+    parser = argparse.ArgumentParser(description="Setup verifier for the RoboCasa offline-RL posttraining task.")
     parser.add_argument("--manifest", default=FROZEN_MANIFEST)
     parser.add_argument("--split", default=FROZEN_SPLIT)
     parser.add_argument("--verify", action="store_true", help="Verify required local dataset paths exist.")
@@ -57,11 +57,11 @@ def main() -> None:
         )
 
     payload = {
-        "task": "robocasa_recap_offline",
+        "task": "robocasa_offlinerl_posttraining",
         "manifest": str(manifest_path),
         "split": str(split_path),
         "task_count": len(summary),
-        "target_task": "PickPlaceCounterToStandMixer",
+        "target_task": "PickPlaceCounterToMicrowave",
         "offline_experience_contract": {
             "demo_advantage": 1.0,
             "bad_rollout_advantage": -1.0,

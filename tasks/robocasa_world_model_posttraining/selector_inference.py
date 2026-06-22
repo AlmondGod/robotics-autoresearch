@@ -15,7 +15,7 @@ if str(ROOT) in sys.path:
 sys.path.insert(0, str(ROOT))
 
 from tasks.robocasa_bc5 import inference as bc5_inference
-from tasks.robocasa_wm_policy_improvement.train import _load_world_model
+from tasks.robocasa_world_model_posttraining.train import _load_world_model
 from train.common import device_from_arg
 
 
@@ -89,12 +89,10 @@ def _score_actions(policy: SelectorPolicy, obs: dict, actions: np.ndarray, task_
         action_norm = (action - stats["action_mean"]) / stats["action_std"].clamp_min(1e-6)
         out = model(state, action_norm, task_t, progress_t)
         success = torch.sigmoid(out["success_logit"]).mean()
-        reward = out["reward"].mean()
         next_progress = out["next_progress"].clamp(0.0, 1.0)
         progress_gain = (next_progress - progress_t).mean()
         score = score + (
             float(policy.checkpoint.get("wm_success_weight", 1.0)) * success
-            + float(policy.checkpoint.get("wm_reward_weight", 0.2)) * reward
             + float(policy.checkpoint.get("wm_progress_weight", 0.4)) * progress_gain
         )
         state = out["next_state"]

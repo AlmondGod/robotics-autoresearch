@@ -6,7 +6,7 @@ for scored runs.
 
 ## Task
 
-- Optimize one policy for `OpenDrawer`, `CloseDrawer`, `CloseFridge`,
+- Optimize one policy for `OpenCabinet`, `CloseDrawer`, `CloseFridge`,
   `TurnOffStove`, `PickPlaceCounterToCabinet`.
 - Metric: rollout success rate over the five tasks.
 - Default eval: 10 episodes/task, max 260 steps, commit 16 unless checkpoint

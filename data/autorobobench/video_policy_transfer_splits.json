@@ -10,7 +10,7 @@
   "eval_episodes_per_task": 10,
   "tasks": [
     {
-      "alias": "OpenDrawer",
+      "alias": "OpenCabinet",
       "task_id": 0,
       "train_episode_ids": [0, 1],
       "paired_train_episode_ids": [0, 1],

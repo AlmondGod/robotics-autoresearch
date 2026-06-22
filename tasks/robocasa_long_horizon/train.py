@@ -12,12 +12,21 @@ from train.train_autorobobench_robocasa_bc5 import main  # noqa: E402
 
 
 DEFAULT_ARGS = {
+    "--manifest": "data/autorobobench/robocasa_long_horizon_manifest.json",
     "--split": "data/autorobobench/robocasa_long_horizon_splits.json",
     "--out-dir": "runs/autorobobench/robocasa_long_horizon/baseline",
-    "--train-episodes-per-task": "4",
-    "--val-episodes-per-task": "2",
-    "--chunk-horizon": "32",
+    "--train-episodes-per-task": "80",
+    "--val-episodes-per-task": "10",
+    "--chunk-horizon": "16",
     "--frame-stride": "1",
+    "--steps": "800",
+    "--batch-size": "128",
+    "--width": "256",
+    "--dropout": "0.03",
+    "--image-noise": "0.004",
+    "--proprio-noise": "0.004",
+    "--chunk-decay": "0.82",
+    "--action-smooth": "0.0005",
     "--progress-scale": "750",
     "--eval-commit-steps": "8",
 }

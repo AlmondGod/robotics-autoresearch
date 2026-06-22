@@ -8,7 +8,6 @@
     ],
     "higher_is_better": true,
     "immutable_globs": [
-      "benchmark.json",
       "data/autorobobench/video_policy_transfer_splits.json",
       "data/autorobobench/video_policy_transfer_video_pool.json",
       "data/robocasa5/manifest.json",

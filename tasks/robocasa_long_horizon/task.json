@@ -8,7 +8,6 @@
     ],
     "higher_is_better": true,
     "immutable_globs": [
-      "benchmark.json",
       "data/autorobobench/robocasa_long_horizon_manifest.json",
       "data/autorobobench/robocasa_long_horizon_splits.json",
       "tasks/robocasa_long_horizon/eval.py",

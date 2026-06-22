@@ -1,7 +1,7 @@
 # AutoRoboBench v0
 
-`benchmark.json` defines the current suites and task specs. `setup.py` is the
-only benchmark measurement entrypoint.
+`setup.py` defines the current suites and is the only benchmark measurement
+entrypoint. Task specs live in each `tasks/<task>/task.json`.
 
 ## Commands
 

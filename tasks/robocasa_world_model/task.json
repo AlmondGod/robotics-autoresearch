@@ -15,7 +15,6 @@
     ],
     "higher_is_better": true,
     "immutable_globs": [
-      "benchmark.json",
       "data/autorobobench/robocasa_bc5_splits.json",
       "data/autorobobench/robocasa_world_model_policy_set.json",
       "data/autorobobench/robocasa_world_model_video_pool.json",

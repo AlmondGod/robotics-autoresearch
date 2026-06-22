@@ -8,7 +8,6 @@
     ],
     "higher_is_better": true,
     "immutable_globs": [
-      "benchmark.json",
       "data/autorobobench/robocasa_choose_measuring_cup_language_manifest.json",
       "data/autorobobench/robocasa_choose_measuring_cup_language_splits.json",
       "tasks/robocasa_choose_measuring_cup_language/eval.py",

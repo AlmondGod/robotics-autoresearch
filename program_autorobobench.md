@@ -22,8 +22,7 @@ Primary score comes from evaluator reruns, not self-reported metrics.
 
 ## Benchmark Metadata
 
-Use `benchmark.json` for suite membership and `python setup.py` for
-measurement:
+Use `setup.py` for suite membership and measurement:
 
 ```bash
 python setup.py --describe-benchmark --suite autorobobench_v0

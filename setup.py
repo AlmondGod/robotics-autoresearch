@@ -27,7 +27,6 @@ PACKAGING_COMMANDS = {
 }
 
 ROOT = Path(__file__).resolve().parent
-BENCHMARK_PATH = ROOT / "benchmark.json"
 
 GENERATED_JSON: dict[str, Any] = {'data/autorobobench/pretrained_policies.json': {'description': 'Pretrained RoboCasa policy artifacts and '
                                                                 'reproducibility metadata used by AutoRoboBench tasks.',
@@ -5024,7 +5023,7 @@ def main() -> None:
     parser.add_argument("--skip-task-setup", action="store_true", help="Only check dependencies, generated JSON, and benchmark metadata.")
     parser.add_argument("--describe-benchmark", action="store_true", help="Print benchmark suite and track metadata, then exit.")
     parser.add_argument("--score-results", default="", help="Score a benchmark results JSON, then exit.")
-    parser.add_argument("--suite", default="autorobobench_v0", help="Suite key inside benchmark.json for describe/score/hash commands.")
+    parser.add_argument("--suite", default="autorobobench_v0", help="Suite key for describe/score/hash commands.")
     parser.add_argument("--hash-manifest", action="store_true", help="Hash immutable benchmark files, then exit.")
     parser.add_argument("--out", default="", help="Optional output path for score/hash commands.")
     args = parser.parse_args()
@@ -5091,8 +5090,6 @@ def _add_runtime_paths() -> None:
 
 
 def _write_generated_files() -> None:
-    if not BENCHMARK_PATH.exists() or json.loads(BENCHMARK_PATH.read_text()) != BENCHMARK_SPEC:
-        BENCHMARK_PATH.write_text(json.dumps(BENCHMARK_SPEC, indent=2, sort_keys=True) + "\n")
     for rel, payload in GENERATED_JSON.items():
         path = ROOT / rel
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -5113,8 +5110,7 @@ def _check_json_files() -> None:
             raise FileNotFoundError(f"missing generated JSON file: {rel}")
         json.loads(path.read_text())
         checked.append(rel)
-    json.loads(BENCHMARK_PATH.read_text())
-    print(json.dumps({"json_files_checked": checked, "benchmark": str(BENCHMARK_PATH)}, indent=2, sort_keys=True), flush=True)
+    print(json.dumps({"json_files_checked": checked, "suite_source": "setup.py:BENCHMARK_SPEC"}, indent=2, sort_keys=True), flush=True)
 
 
 def _run_task_setups(*, verify: bool) -> None:
